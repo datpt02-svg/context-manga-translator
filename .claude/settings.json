@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(winget --version)",
+      "PowerShell(choco --version 2>$null)",
+      "PowerShell(scoop --version 2>$null)",
+      "PowerShell(choco install llvm -y --no-progress)",
+      "PowerShell(choco install llvm -y --no-progress --package-parameters=\"/NoAdmin\" 2>&1)",
+      "PowerShell(choco install llvm -y --no-progress --forcex86 2>&1)",
+      "Bash(curl -sL -o /tmp/llvm.zip \"https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe\" --max-time 10 -w \"HTTP:%{http_code}\\\\n\")",
+      "Read(//tmp/**)",
+      "Bash(rm -f /tmp/llvm.zip)",
+      "Bash(curl -sL \"https://api.github.com/repos/llvm/llvm-project/releases/latest\" --max-time 15)",
+      "Bash(grep -iE \"win64.*\\\\.\\(zip|7z\\)$\")",
+      "Bash(curl -sL \"https://api.github.com/repos/llvm/llvm-project/releases/latest\" --max-time 15 -o /tmp/release.json)",
+      "Bash(mkdir -p /c/tools)",
+      "Read(//c/tools/**)",
+      "Bash(curl -L -o llvm.tar.xz \"https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/clang+llvm-22.1.8-x86_64-pc-windows-msvc.tar.xz\" --max-time 600 -w \"HTTP:%{http_code} SIZE:%{size_download}\\\\n\")",
+      "PowerShell(where 7z 2>$null; where 7za 2>$null; [System.Reflection.Assembly]::LoadWithPartialName\\(\"System.IO.Compression\"\\) | Out-Null; \\(Get-Command Expand-Archive\\).Source)",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(python -c \"import lzma, tarfile; t=tarfile.open\\(r'C:\\\\tools\\\\llvm.tar.xz','r:xz'\\); t.extractall\\(r'C:\\\\tools\\\\'\\); print\\('done'\\)\")",
+      "Bash(python C:/tools/extract.py)",
+      "Bash(rm -f \"C:/tools/llvm.tar.xz\" \"C:/tools/extract.py\"; ls \"C:/tools/\")",
+      "Bash(export LIBCLANG_PATH='C:\\\\tools\\\\clang+llvm-22.1.8-x86_64-pc-windows-msvc\\\\bin')",
+      "Bash(cargo build *)",
+      "Bash(cargo run *)",
+      "Bash(curl -sS -o - -w \"\\\\nHTTP:%{http_code}\\\\n\" http://127.0.0.1:4000/health)",
+      "PowerShell([System.Environment]::SetEnvironmentVariable\\('LIBCLANG_PATH','C:\\\\tools\\\\clang+llvm-22.1.8-x86_64-pc-windows-msvc\\\\bin','User'\\); $env:LIBCLANG_PATH='C:\\\\tools\\\\clang+llvm-22.1.8-x86_64-pc-windows-msvc\\\\bin'; \"LIBCLANG_PATH=$env:LIBCLANG_PATH\"; Test-Path \"$env:LIBCLANG_PATH\\\\libclang.dll\")",
+      "Bash(LIBCLANG_PATH='C:/tools/clang+llvm-22.1.8-x86_64-pc-windows-msvc/bin' cargo run -p koharu -- --cpu --port 4000 --headless --debug)",
+      "Bash(LIBCLANG_PATH='C:/tools/clang+llvm-22.1.8-x86_64-pc-windows-msvc/bin' \"D:/project/koharu/target/debug/koharu.exe\" --cpu --port 4000 --headless --debug)",
+      "Bash(netstat -ano)",
+      "Bash(\"D:/project/koharu/target/debug/koharu.exe\" --cpu --port 4000 --headless --debug)",
+      "Bash(curl -sS -o - -w \"\\\\nHTTP:%{http_code}\\\\n\" http://127.0.0.1:4000/)",
+      "Bash(tasklist)",
+      "Bash(curl -sS http://127.0.0.1:4000/api/health)",
+      "Bash(curl -sS http://127.0.0.1:4000/v1/models)",
+      "Bash(curl -sS -X POST http://127.0.0.1:4000/v1/models)",
+      "Bash(cygpath -d 'D:\\\\project\\\\koharu')",
+      "Bash(sed -n '540,572p' \"$\\(cygpath -d 'D:\\\\project\\\\koharu'\\)/ui/components/SettingsDialog.tsx\")",
+      "Bash(cd /d \"$\\(cygpath -d 'D:\\\\project\\\\koharu'\\)/ui\")",
+      "Bash(npx --package typescript tsc --noEmit)",
+      "Bash(npx next *)",
+      "PowerShell(Get-ChildItem D:\\\\project\\\\koharu\\\\target -Recurse -Directory -Depth 0 | ForEach-Object { $size = \\(Get-ChildItem $_.FullName -Recurse -File | Measure-Object -Property Length -Sum\\).Sum; [PSCustomObject]@{Directory = $_.Name; SizeMB = [math]::Round\\($size / 1MB, 1\\)} } | Sort-Object SizeMB -Descending)"
+    ],
+    "additionalDirectories": [
+      "C:\\tools"
+    ]
+  }
+}
