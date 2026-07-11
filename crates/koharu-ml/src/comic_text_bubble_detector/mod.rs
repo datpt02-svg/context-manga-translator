@@ -461,6 +461,35 @@ fn post_process_object_detection(
     let (image_width, image_height) = target_size;
     let image_width = image_width as f32;
     let image_height = image_height as f32;
+
+    // TEMPORARY DIAGNOSTIC: dump the highest-scoring candidates before the
+    // threshold cut so we can see how close low-confidence regions (e.g.
+    // stylized SFX text) got to `threshold`. Remove after diagnosis.
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        for (score, query_index, class_id) in scored.iter().take(40) {
+            let box_offset = query_index * 4;
+            let bbox = scale_box_to_image(
+                [
+                    pred_boxes[box_offset],
+                    pred_boxes[box_offset + 1],
+                    pred_boxes[box_offset + 2],
+                    pred_boxes[box_offset + 3],
+                ],
+                image_width,
+                image_height,
+            );
+            tracing::debug!(
+                score,
+                label = config.label(*class_id),
+                x0 = bbox[0],
+                y0 = bbox[1],
+                x1 = bbox[2],
+                y1 = bbox[3],
+                "raw candidate (pre-threshold)"
+            );
+        }
+    }
+
     let mut detections = Vec::new();
     for (score, query_index, class_id) in scored {
         if score < threshold {
