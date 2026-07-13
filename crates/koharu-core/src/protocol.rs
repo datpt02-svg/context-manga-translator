@@ -4,10 +4,25 @@
 //! DTOs (multipart import, pipeline start) live in `koharu-rpc/src/routes/`.
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::google_fonts::FontSource;
+
+/// Deserializes a JSON field that is `Option<Option<T>>` at the Rust level,
+/// distinguishing "field omitted" (`None`, outer) from "field present with
+/// `null`" (`Some(None)`, meaning "clear it"). Plain `#[derive(Deserialize)]`
+/// on `Option<Option<T>>` cannot make this distinction: both cases collapse
+/// to `None` because `Option<T>::deserialize` treats a JSON `null` as
+/// "visit_none" before this wrapper ever sees it. Use with
+/// `#[serde(default, deserialize_with = "deserialize_double_option")]`.
+fn deserialize_double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
+}
 
 // ---------------------------------------------------------------------------
 // Meta / fonts
@@ -235,6 +250,10 @@ pub struct PipelineConfigPatch {
     pub unlimited_ocr_mode: Option<UnlimitedOcrMode>,
     #[serde(default)]
     pub unlimited_ocr_url: Option<Option<String>>,
+    /// `Some(Some(x))` sets an override, `Some(None)` clears it back to the
+    /// detector's built-in default, `None` leaves the existing value as-is.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub detector_confidence_threshold: Option<Option<f32>>,
 }
 
 // ---------------------------------------------------------------------------

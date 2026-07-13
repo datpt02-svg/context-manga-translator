@@ -24,6 +24,7 @@ const DETECTOR_NAME: &str = "comic-text-bubble-detector";
 // 1. Define the communication protocol
 struct DetectMessage {
     image: image::DynamicImage,
+    threshold: Option<f32>,
     respond_to: oneshot::Sender<Result<ComicTextBubbleDetection>>,
 }
 
@@ -36,6 +37,7 @@ pub struct Model {
 impl Engine for Model {
     async fn run(&self, ctx: EngineCtx<'_>) -> Result<Vec<Op>> {
         let image = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
+        let threshold = ctx.options.detector_confidence_threshold;
 
         // Create a one-time return channel
         let (resp_tx, resp_rx) = oneshot::channel();
@@ -45,6 +47,7 @@ impl Engine for Model {
         self.sender
             .send(DetectMessage {
                 image,
+                threshold,
                 respond_to: resp_tx,
             })
             .await
@@ -105,7 +108,12 @@ inventory::submit! {
 
                     // Listen continuously for pipeline requests
                     while let Some(msg) = rx.recv().await {
-                        let result = detector.inference(&msg.image);
+                        let result = match msg.threshold {
+                            Some(threshold) => {
+                                detector.inference_with_threshold(&msg.image, threshold)
+                            }
+                            None => detector.inference(&msg.image),
+                        };
                         let _ = msg.respond_to.send(result);
                     }
                 });

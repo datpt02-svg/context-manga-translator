@@ -47,6 +47,7 @@ import { Input } from '@/components/ui/input'
 import { Kbd } from '@/components/ui/kbd'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
@@ -117,6 +118,7 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
       renderer: cfg.pipeline.renderer,
       unlimitedOcrMode: cfg.pipeline.unlimited_ocr_mode ?? null,
       unlimitedOcrUrl: cfg.pipeline.unlimited_ocr_url ?? null,
+      detectorConfidenceThreshold: cfg.pipeline.detector_confidence_threshold ?? null,
     }
   }
   if (cfg.providers) {
@@ -496,6 +498,16 @@ function AppearancePane() {
 
 // ── Engines ──────────────────────────────────────────────────────
 
+// Client-side display-only defaults, mirroring each detector's built-in
+// threshold in Rust (koharu-ml). Not the source of truth — only used to
+// show a "Default: X" hint and to seed the slider when no override is set.
+const DETECTOR_DEFAULT_THRESHOLD: Record<string, number> = {
+  'comic-text-bubble-detector': 0.3,
+  'comic-text-detector': 0.4,
+  'pp-doclayout-v3': 0.25,
+  'anime-text': 0.25,
+}
+
 function EnginesPane({
   catalog,
   pipeline,
@@ -506,6 +518,17 @@ function EnginesPane({
   onChange: (pipeline: import('@/lib/api/schemas').PipelineConfig) => void
 }) {
   const { t } = useTranslation()
+
+  const currentDetector = pipeline.detector ?? catalog.detectors[0]?.id ?? ''
+  const detectorDefaultThreshold = DETECTOR_DEFAULT_THRESHOLD[currentDetector]
+  const detectorThreshold = pipeline.detector_confidence_threshold ?? detectorDefaultThreshold
+
+  // Local draft value so dragging the slider feels smooth (no network
+  // round-trip per pixel). Only persisted via onValueCommit on release.
+  const [thresholdDraft, setThresholdDraft] = useState(detectorThreshold)
+  useEffect(() => {
+    setThresholdDraft(detectorThreshold)
+  }, [detectorThreshold])
 
   const sections = [
     {
@@ -568,6 +591,47 @@ function EnginesPane({
                 ))}
               </SelectContent>
             </Select>
+            {key === 'detector' && detectorDefaultThreshold !== undefined && (
+              <div className='space-y-1.5 pt-1 pl-1'>
+                <div className='flex items-center justify-between'>
+                  <Label className='text-xs text-muted-foreground'>
+                    {t('settings.detectorConfidenceThreshold')}
+                  </Label>
+                  <div className='flex items-center gap-2'>
+                    <span className='text-xs tabular-nums text-muted-foreground'>
+                      {detectorThreshold?.toFixed(2)}
+                    </span>
+                    {pipeline.detector_confidence_threshold != null && (
+                      <button
+                        type='button'
+                        className='text-xs text-muted-foreground underline hover:text-foreground'
+                        onClick={() =>
+                          onChange({ ...pipeline, detector_confidence_threshold: null })
+                        }
+                      >
+                        {t('settings.detectorConfidenceThresholdReset')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <Slider
+                  value={[thresholdDraft ?? detectorDefaultThreshold]}
+                  min={0.05}
+                  max={0.95}
+                  step={0.01}
+                  onValueChange={([v]) => setThresholdDraft(v)}
+                  onValueCommit={([v]) =>
+                    onChange({ ...pipeline, detector_confidence_threshold: v })
+                  }
+                />
+                <p className='text-xs text-muted-foreground'>
+                  {t('settings.detectorConfidenceThresholdDescription')}{' '}
+                  {t('settings.detectorConfidenceThresholdDefault', {
+                    value: detectorDefaultThreshold.toFixed(2),
+                  })}
+                </p>
+              </div>
+            )}
           </div>
         ))}
       </div>

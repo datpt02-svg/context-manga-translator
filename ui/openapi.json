@@ -1037,6 +1037,7 @@
             "default": {
               "bubble_segmenter": "speech-bubble-segmentation",
               "detector": "pp-doclayout-v3",
+              "detector_confidence_threshold": null,
               "font_detector": "yuzumarker-font-detection",
               "inpainter": "lama-manga",
               "ocr": "paddle-ocr-vl-1.6",
@@ -2992,6 +2993,15 @@
             "type": "string",
             "default": "pp-doclayout-v3"
           },
+          "detector_confidence_threshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "Confidence threshold override (0.0..=1.0) for the currently selected\n`detector` engine. `None` = use that engine's built-in default.",
+            "default": null
+          },
           "font_detector": {
             "type": "string",
             "default": "yuzumarker-font-detection"
@@ -3047,6 +3057,14 @@
               "string",
               "null"
             ]
+          },
+          "detectorConfidenceThreshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "`Some(Some(x))` sets an override, `Some(None)` clears it back to the\ndetector's built-in default, `None` leaves the existing value as-is."
           },
           "fontDetector": {
             "type": [

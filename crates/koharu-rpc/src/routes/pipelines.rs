@@ -93,6 +93,8 @@ async fn start_pipeline(
         }
     }
 
+    let detector_confidence_threshold = app.config.load().pipeline.detector_confidence_threshold;
+
     let spec = PipelineSpec {
         scope: match req.pages {
             Some(pages) => Scope::Pages(pages),
@@ -108,6 +110,7 @@ async fn start_pipeline(
             reading_order: req.reading_order,
             unlimited_ocr_mode: req.unlimited_ocr_mode,
             unlimited_ocr_url: req.unlimited_ocr_url,
+            detector_confidence_threshold,
         },
     };
 

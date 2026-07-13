@@ -194,6 +194,7 @@ impl KoharuServer {
                 region: None,
                 unlimited_ocr_mode: Default::default(),
                 unlimited_ocr_url: None,
+                detector_confidence_threshold: None,
             },
         };
         let job_id = Uuid::new_v4().to_string();

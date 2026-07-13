@@ -121,11 +121,21 @@ impl ComicTextDetector {
 
     #[instrument(level = "debug", skip_all)]
     pub fn inference(&self, image: &DynamicImage) -> anyhow::Result<ComicTextDetection> {
+        self.inference_with_threshold(image, CONFIDENCE_THRESHOLD)
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    pub fn inference_with_threshold(
+        &self,
+        image: &DynamicImage,
+        threshold: f32,
+    ) -> anyhow::Result<ComicTextDetection> {
         let original_dimensions = image.dimensions();
         let (image_tensor, resized_dimensions) = preprocess(image, &self.device, self.dtype)?;
         let (predictions, mask, shrink_threshold) = self.forward(&image_tensor)?;
 
-        let bboxes = postprocess_yolo(&predictions, original_dimensions, resized_dimensions)?;
+        let bboxes =
+            postprocess_yolo(&predictions, original_dimensions, resized_dimensions, threshold)?;
         let shrink_map = tensor_channel_to_gray_resized(
             &shrink_threshold.i((0, 0))?,
             original_dimensions.0,
@@ -230,6 +240,7 @@ fn postprocess_yolo(
     predictions: &Tensor,
     original_dimensions: (u32, u32),
     resized_dimensions: (u32, u32),
+    threshold: f32,
 ) -> anyhow::Result<Vec<Bbox<usize>>> {
     let predictions = predictions.squeeze(0)?.to_dtype(DType::F32)?;
     let (_, num_outputs) = predictions.dims2()?;
@@ -255,7 +266,7 @@ fn postprocess_yolo(
                 .unwrap_or((0, 0.0));
             (cls_idx, pred[4] * cls_score)
         };
-        if confidence < CONFIDENCE_THRESHOLD {
+        if confidence < threshold {
             continue;
         }
 

@@ -12,6 +12,12 @@ import type { UnlimitedOcrMode } from './unlimitedOcrMode';
 export interface PipelineConfig {
   bubble_segmenter?: string;
   detector?: string;
+  /**
+     * Confidence threshold override (0.0..=1.0) for the currently selected
+     * `detector` engine. `None` = use that engine's built-in default.
+     * @nullable
+     */
+  detector_confidence_threshold?: number | null;
   font_detector?: string;
   inpainter?: string;
   ocr?: string;

@@ -231,6 +231,7 @@ async fn run() -> Result<()> {
             region: None,
             unlimited_ocr_mode: Default::default(),
             unlimited_ocr_url: None,
+            detector_confidence_threshold: None,
         },
     };
 

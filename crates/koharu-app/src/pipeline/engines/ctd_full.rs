@@ -16,6 +16,7 @@ use crate::pipeline::engines::support::{
 };
 
 const DETECTOR_NAME: &str = "ctd";
+const DEFAULT_CONFIDENCE_THRESHOLD: f32 = 0.4;
 
 pub struct Model(ComicTextDetector);
 
@@ -23,7 +24,11 @@ pub struct Model(ComicTextDetector);
 impl Engine for Model {
     async fn run(&self, ctx: EngineCtx<'_>) -> Result<Vec<Op>> {
         let image = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
-        let det = self.0.inference(&image)?;
+        let threshold = ctx
+            .options
+            .detector_confidence_threshold
+            .unwrap_or(DEFAULT_CONFIDENCE_THRESHOLD);
+        let det = self.0.inference_with_threshold(&image, threshold)?;
 
         // Segmentation mask blob.
         let mask_blob = ctx.blobs.put_webp(&DynamicImage::ImageLuma8(det.mask))?;

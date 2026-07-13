@@ -9,6 +9,12 @@ export interface PipelineConfigPatch {
   bubbleSegmenter?: string | null;
   /** @nullable */
   detector?: string | null;
+  /**
+     * `Some(Some(x))` sets an override, `Some(None)` clears it back to the
+     * detector's built-in default, `None` leaves the existing value as-is.
+     * @nullable
+     */
+  detectorConfidenceThreshold?: number | null;
   /** @nullable */
   fontDetector?: string | null;
   /** @nullable */

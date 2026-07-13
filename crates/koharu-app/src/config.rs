@@ -85,6 +85,10 @@ pub struct PipelineConfig {
     pub unlimited_ocr_mode: UnlimitedOcrMode,
     #[serde(default)]
     pub unlimited_ocr_url: Option<String>,
+    /// Confidence threshold override (0.0..=1.0) for the currently selected
+    /// `detector` engine. `None` = use that engine's built-in default.
+    #[serde(default)]
+    pub detector_confidence_threshold: Option<f32>,
 }
 
 impl Default for PipelineConfig {
@@ -100,6 +104,7 @@ impl Default for PipelineConfig {
             renderer: "koharu-renderer".to_string(),
             unlimited_ocr_mode: UnlimitedOcrMode::Off,
             unlimited_ocr_url: None,
+            detector_confidence_threshold: None,
         }
     }
 }
@@ -249,6 +254,9 @@ pub fn apply_patch(config: &mut AppConfig, patch: koharu_core::ConfigPatch) {
         }
         if let Some(v) = p.unlimited_ocr_url {
             config.pipeline.unlimited_ocr_url = v;
+        }
+        if let Some(v) = p.detector_confidence_threshold {
+            config.pipeline.detector_confidence_threshold = v.map(|x| x.clamp(0.0, 1.0));
         }
     }
     if let Some(providers) = patch.providers {

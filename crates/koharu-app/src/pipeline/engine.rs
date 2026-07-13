@@ -68,6 +68,9 @@ pub struct PipelineRunOptions {
     pub unlimited_ocr_mode: UnlimitedOcrMode,
     /// Base URL of the Unlimited-OCR Python service.
     pub unlimited_ocr_url: Option<String>,
+    /// Confidence threshold override for the active detector engine.
+    /// `None` = use that engine's built-in default.
+    pub detector_confidence_threshold: Option<f32>,
 }
 
 // ---------------------------------------------------------------------------

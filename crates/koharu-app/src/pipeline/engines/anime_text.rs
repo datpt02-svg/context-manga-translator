@@ -14,13 +14,22 @@ use crate::pipeline::engines::support::{
 
 const DETECTOR_NAME: &str = "anime-text";
 
+const DEFAULT_NMS_THRESHOLD: f32 = 0.45;
+const DEFAULT_CONFIDENCE_THRESHOLD: f32 = 0.25;
+
 pub struct Model(AnimeTextDetector);
 
 #[async_trait]
 impl Engine for Model {
     async fn run(&self, ctx: EngineCtx<'_>) -> Result<Vec<Op>> {
         let image = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
-        let det = self.0.inference(&image)?;
+        let confidence_threshold = ctx
+            .options
+            .detector_confidence_threshold
+            .unwrap_or(DEFAULT_CONFIDENCE_THRESHOLD);
+        let det = self
+            .0
+            .inference_with_thresholds(&image, confidence_threshold, DEFAULT_NMS_THRESHOLD)?;
 
         let mut pairs: Vec<([f32; 4], TextData)> = det
             .text_blocks
