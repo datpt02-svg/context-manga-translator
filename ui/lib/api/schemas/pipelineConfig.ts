@@ -24,6 +24,12 @@ export interface PipelineConfig {
   ocr?: string;
   renderer?: string;
   segmenter?: string;
+  /**
+     * Binary mask threshold override (0.0..=1.0) for the currently selected
+     * `segmenter` engine. `None` = use that engine's built-in default.
+     * @nullable
+     */
+  segmenter_binary_threshold?: number | null;
   translator?: string;
   unlimited_ocr_mode?: UnlimitedOcrMode;
   /** @nullable */

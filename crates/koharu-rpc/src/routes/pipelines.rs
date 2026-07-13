@@ -92,6 +92,7 @@ async fn start_pipeline(
 
     let pipeline_config = app.config.load().pipeline.clone();
     let detector_confidence_threshold = pipeline_config.detector_confidence_threshold;
+    let segmenter_binary_threshold = pipeline_config.segmenter_binary_threshold;
     let comic_text_bubble_detector_classes = pipeline_config.comic_text_bubble_detector_classes;
 
     let spec = PipelineSpec {
@@ -110,6 +111,7 @@ async fn start_pipeline(
             unlimited_ocr_mode: req.unlimited_ocr_mode,
             unlimited_ocr_url: req.unlimited_ocr_url,
             detector_confidence_threshold,
+            segmenter_binary_threshold,
             comic_text_bubble_detector_classes,
         },
     };

@@ -89,6 +89,10 @@ pub struct PipelineConfig {
     /// `detector` engine. `None` = use that engine's built-in default.
     #[serde(default)]
     pub detector_confidence_threshold: Option<f32>,
+    /// Binary mask threshold override (0.0..=1.0) for the currently selected
+    /// `segmenter` engine. `None` = use that engine's built-in default.
+    #[serde(default)]
+    pub segmenter_binary_threshold: Option<f32>,
     #[serde(default = "default_comic_text_bubble_detector_classes")]
     pub comic_text_bubble_detector_classes: Vec<String>,
 }
@@ -117,6 +121,7 @@ impl Default for PipelineConfig {
             unlimited_ocr_mode: UnlimitedOcrMode::Off,
             unlimited_ocr_url: None,
             detector_confidence_threshold: None,
+            segmenter_binary_threshold: None,
             comic_text_bubble_detector_classes: default_comic_text_bubble_detector_classes(),
         }
     }
@@ -270,6 +275,9 @@ pub fn apply_patch(config: &mut AppConfig, patch: koharu_core::ConfigPatch) {
         }
         if let Some(v) = p.detector_confidence_threshold {
             config.pipeline.detector_confidence_threshold = v.map(|x| x.clamp(0.0, 1.0));
+        }
+        if let Some(v) = p.segmenter_binary_threshold {
+            config.pipeline.segmenter_binary_threshold = v.map(|x| x.clamp(0.0, 1.0));
         }
         if let Some(v) = p.comic_text_bubble_detector_classes {
             config.pipeline.comic_text_bubble_detector_classes = v;
@@ -523,5 +531,33 @@ mod tests {
         );
 
         assert_eq!(config.pipeline.renderer, PipelineConfig::default().renderer);
+    }
+
+    #[test]
+    fn apply_patch_clamps_and_clears_segmenter_binary_threshold() {
+        let mut config = AppConfig::default();
+        apply_patch(
+            &mut config,
+            ConfigPatch {
+                pipeline: Some(PipelineConfigPatch {
+                    segmenter_binary_threshold: Some(Some(1.5)),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
+        assert_eq!(config.pipeline.segmenter_binary_threshold, Some(1.0));
+
+        apply_patch(
+            &mut config,
+            ConfigPatch {
+                pipeline: Some(PipelineConfigPatch {
+                    segmenter_binary_threshold: Some(None),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
+        assert_eq!(config.pipeline.segmenter_binary_threshold, None);
     }
 }

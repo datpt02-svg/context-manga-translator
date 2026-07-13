@@ -5,7 +5,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use image::DynamicImage;
 use koharu_core::{MaskRole, Op};
-use koharu_ml::comic_text_detector::{ComicTextDetector, refine_segmentation_mask};
+use koharu_ml::comic_text_detector::{
+    ComicTextDetector, refine_segmentation_mask, refine_segmentation_mask_with_threshold,
+};
 use koharu_ml::types::TextRegion;
 
 use crate::pipeline::artifacts::Artifact;
@@ -27,7 +29,15 @@ impl Engine for Model {
             .map(|(_, transform, text)| text_node_to_region(transform, text))
             .collect();
 
-        let mask = refine_segmentation_mask(&image, &prob_mask, &regions);
+        let mask = match ctx.options.segmenter_binary_threshold {
+            Some(threshold) => refine_segmentation_mask_with_threshold(
+                &image,
+                &prob_mask,
+                &regions,
+                (threshold.clamp(0.0, 1.0) * 255.0).round() as u8,
+            ),
+            None => refine_segmentation_mask(&image, &prob_mask, &regions),
+        };
         let mask_blob = ctx.blobs.put_webp(&DynamicImage::ImageLuma8(mask))?;
 
         Ok(vec![upsert_mask_blob(

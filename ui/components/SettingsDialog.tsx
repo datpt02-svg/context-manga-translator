@@ -121,6 +121,7 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
       unlimitedOcrMode: cfg.pipeline.unlimited_ocr_mode ?? null,
       unlimitedOcrUrl: cfg.pipeline.unlimited_ocr_url ?? null,
       detectorConfidenceThreshold: cfg.pipeline.detector_confidence_threshold ?? null,
+      segmenterBinaryThreshold: cfg.pipeline.segmenter_binary_threshold ?? null,
       comicTextBubbleDetectorClasses:
         cfg.pipeline.comic_text_bubble_detector_classes ?? [
           ...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES,
@@ -513,6 +514,9 @@ const DETECTOR_DEFAULT_THRESHOLD: Record<string, number> = {
   'pp-doclayout-v3': 0.25,
   'anime-text': 0.25,
 }
+const SEGMENTER_DEFAULT_THRESHOLD: Record<string, number> = {
+  'comic-text-detector-seg': 60 / 255,
+}
 
 const DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES = ['text_bubble', 'text_free'] as const
 const COMIC_TEXT_BUBBLE_DETECTOR_CLASSES = [
@@ -534,15 +538,22 @@ function EnginesPane({
   const currentDetector = pipeline.detector ?? catalog.detectors[0]?.id ?? ''
   const detectorDefaultThreshold = DETECTOR_DEFAULT_THRESHOLD[currentDetector]
   const detectorThreshold = pipeline.detector_confidence_threshold ?? detectorDefaultThreshold
+  const currentSegmenter = pipeline.segmenter ?? catalog.segmenters[0]?.id ?? ''
+  const segmenterDefaultThreshold = SEGMENTER_DEFAULT_THRESHOLD[currentSegmenter]
+  const segmenterThreshold = pipeline.segmenter_binary_threshold ?? segmenterDefaultThreshold
   const comicTextBubbleDetectorClasses =
     pipeline.comic_text_bubble_detector_classes ?? [...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES]
 
-  // Local draft value so dragging the slider feels smooth (no network
+  // Local draft values so dragging sliders feels smooth (no network
   // round-trip per pixel). Only persisted via onValueCommit on release.
   const [thresholdDraft, setThresholdDraft] = useState(detectorThreshold)
+  const [segmenterThresholdDraft, setSegmenterThresholdDraft] = useState(segmenterThreshold)
   useEffect(() => {
     setThresholdDraft(detectorThreshold)
   }, [detectorThreshold])
+  useEffect(() => {
+    setSegmenterThresholdDraft(segmenterThreshold)
+  }, [segmenterThreshold])
 
   const sections = [
     {
@@ -642,6 +653,43 @@ function EnginesPane({
                   {t('settings.detectorConfidenceThresholdDescription')}{' '}
                   {t('settings.detectorConfidenceThresholdDefault', {
                     value: detectorDefaultThreshold.toFixed(2),
+                  })}
+                </p>
+              </div>
+            )}
+            {key === 'segmenter' && segmenterDefaultThreshold !== undefined && (
+              <div className='space-y-1.5 pt-1 pl-1'>
+                <div className='flex items-center justify-between'>
+                  <Label className='text-xs text-muted-foreground'>
+                    {t('settings.segmenterBinaryThreshold')}
+                  </Label>
+                  <div className='flex items-center gap-2'>
+                    <span className='text-xs tabular-nums text-muted-foreground'>
+                      {segmenterThreshold?.toFixed(2)}
+                    </span>
+                    {pipeline.segmenter_binary_threshold != null && (
+                      <button
+                        type='button'
+                        className='text-xs text-muted-foreground underline hover:text-foreground'
+                        onClick={() => onChange({ ...pipeline, segmenter_binary_threshold: null })}
+                      >
+                        {t('settings.segmenterBinaryThresholdReset')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <Slider
+                  value={[segmenterThresholdDraft ?? segmenterDefaultThreshold]}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onValueChange={([v]) => setSegmenterThresholdDraft(v)}
+                  onValueCommit={([v]) => onChange({ ...pipeline, segmenter_binary_threshold: v })}
+                />
+                <p className='text-xs text-muted-foreground'>
+                  {t('settings.segmenterBinaryThresholdDescription')}{' '}
+                  {t('settings.segmenterBinaryThresholdDefault', {
+                    value: segmenterDefaultThreshold.toFixed(2),
                   })}
                 </p>
               </div>

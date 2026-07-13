@@ -436,6 +436,10 @@
     "detectorConfidenceThresholdDescription": "Lower values catch more text (including stylized SFX) but risk more false positives.",
     "detectorConfidenceThresholdDefault": "Default: {{value}}",
     "detectorConfidenceThresholdReset": "Reset to default",
+    "segmenterBinaryThreshold": "Segmenter Binary Threshold",
+    "segmenterBinaryThresholdDescription": "Lower values keep more mask pixels; higher values keep only stronger text pixels.",
+    "segmenterBinaryThresholdDefault": "Default: {{value}}",
+    "segmenterBinaryThresholdReset": "Reset to default",
     "comicTextBubbleDetectorClasses": "Comic Text & Bubble Classes",
     "comicTextBubbleDetectorClassesDescription": "Choose which ogkalu detector classes become text boxes.",
     "comicTextBubbleDetectorClass": {

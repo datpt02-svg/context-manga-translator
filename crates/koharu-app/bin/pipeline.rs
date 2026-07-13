@@ -219,6 +219,7 @@ async fn run() -> Result<()> {
             println!("{line}");
         });
 
+    let pipeline_config = app.config.load().pipeline.clone();
     let spec = koharu_app::pipeline::PipelineSpec {
         scope: koharu_app::pipeline::Scope::Pages(vec![page_id]),
         steps,
@@ -232,12 +233,8 @@ async fn run() -> Result<()> {
             unlimited_ocr_mode: Default::default(),
             unlimited_ocr_url: None,
             detector_confidence_threshold: None,
-            comic_text_bubble_detector_classes: app
-                .config
-                .load()
-                .pipeline
-                .comic_text_bubble_detector_classes
-                .clone(),
+            segmenter_binary_threshold: pipeline_config.segmenter_binary_threshold,
+            comic_text_bubble_detector_classes: pipeline_config.comic_text_bubble_detector_classes,
         },
     };
 

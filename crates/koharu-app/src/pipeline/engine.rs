@@ -71,6 +71,9 @@ pub struct PipelineRunOptions {
     /// Confidence threshold override for the active detector engine.
     /// `None` = use that engine's built-in default.
     pub detector_confidence_threshold: Option<f32>,
+    /// Binary mask threshold override for the active segmenter engine.
+    /// `None` = use that engine's built-in default.
+    pub segmenter_binary_threshold: Option<f32>,
     pub comic_text_bubble_detector_classes: Vec<String>,
 }
 
@@ -86,6 +89,7 @@ impl Default for PipelineRunOptions {
             unlimited_ocr_mode: UnlimitedOcrMode::Off,
             unlimited_ocr_url: None,
             detector_confidence_threshold: None,
+            segmenter_binary_threshold: None,
             comic_text_bubble_detector_classes: vec![
                 "text_bubble".to_string(),
                 "text_free".to_string(),

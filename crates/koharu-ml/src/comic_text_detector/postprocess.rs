@@ -23,9 +23,18 @@ pub struct ComicTextDetection {
 }
 
 pub fn refine_segmentation_mask(
+    image: &DynamicImage,
+    pred_mask: &GrayImage,
+    blocks: &[TextRegion],
+) -> GrayImage {
+    refine_segmentation_mask_with_threshold(image, pred_mask, blocks, super::BINARY_THRESHOLD)
+}
+
+pub fn refine_segmentation_mask_with_threshold(
     _image: &DynamicImage,
     pred_mask: &GrayImage,
     blocks: &[TextRegion],
+    binary_threshold: u8,
 ) -> GrayImage {
     let width = pred_mask.width();
     let height = pred_mask.height();
@@ -52,10 +61,9 @@ pub fn refine_segmentation_mask(
     }
 
     // Apply a threshold mask: Pixels are preserved exclusively if their probability
-    // exceeds the core threshold (`super::BINARY_THRESHOLD`) and they reside within a known TextRegion geometry.
+    // exceeds the threshold and they reside within a known TextRegion geometry.
     let base = GrayImage::from_fn(width, height, |x, y| {
-        if in_bounds_mask.get_pixel(x, y)[0] != 0
-            && pred_mask.get_pixel(x, y)[0] > super::BINARY_THRESHOLD
+        if in_bounds_mask.get_pixel(x, y)[0] != 0 && pred_mask.get_pixel(x, y)[0] > binary_threshold
         {
             Luma([255])
         } else {
@@ -359,7 +367,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mask = refine_segmentation_mask(&image, &pred_mask, &[block]);
+        let mask = refine_segmentation_mask(&image, &pred_mask, std::slice::from_ref(&block));
         let without_blocks = refine_segmentation_mask(&image, &pred_mask, &[]);
 
         // Assert providing bounding blocks saves the mask within bounds
@@ -370,6 +378,31 @@ mod tests {
         assert_eq!(mask.get_pixel(20, 13)[0], 0);
         // Assert pixel JUST OUTSIDE the block boundary is cleared
         assert_eq!(mask.get_pixel(15, 13)[0], 0);
+    }
+
+    #[test]
+    fn refine_segmentation_mask_honors_binary_threshold() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(16, 16, Rgb([255, 255, 255])));
+        let pred_mask = GrayImage::from_pixel(16, 16, Luma([100]));
+        let block = TextRegion {
+            x: 4.0,
+            y: 4.0,
+            width: 4.0,
+            height: 4.0,
+            detected_font_size_px: Some(4.0),
+            ..Default::default()
+        };
+
+        let low = refine_segmentation_mask_with_threshold(
+            &image,
+            &pred_mask,
+            std::slice::from_ref(&block),
+            99,
+        );
+        let high = refine_segmentation_mask_with_threshold(&image, &pred_mask, &[block], 100);
+
+        assert_eq!(low.get_pixel(6, 6)[0], 255);
+        assert_eq!(high.get_pixel(6, 6)[0], 0);
     }
 
     #[test]

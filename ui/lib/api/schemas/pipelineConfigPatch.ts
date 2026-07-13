@@ -27,6 +27,12 @@ export interface PipelineConfigPatch {
   renderer?: string | null;
   /** @nullable */
   segmenter?: string | null;
+  /**
+     * `Some(Some(x))` sets an override, `Some(None)` clears it back to the
+     * segmenter's built-in default, `None` leaves the existing value as-is.
+     * @nullable
+     */
+  segmenterBinaryThreshold?: number | null;
   /** @nullable */
   translator?: string | null;
   unlimitedOcrMode?: null | UnlimitedOcrMode;

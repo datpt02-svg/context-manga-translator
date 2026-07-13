@@ -254,6 +254,10 @@ pub struct PipelineConfigPatch {
     /// detector's built-in default, `None` leaves the existing value as-is.
     #[serde(default, deserialize_with = "deserialize_double_option")]
     pub detector_confidence_threshold: Option<Option<f32>>,
+    /// `Some(Some(x))` sets an override, `Some(None)` clears it back to the
+    /// segmenter's built-in default, `None` leaves the existing value as-is.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub segmenter_binary_threshold: Option<Option<f32>>,
     #[serde(default)]
     pub comic_text_bubble_detector_classes: Option<Vec<String>>,
 }

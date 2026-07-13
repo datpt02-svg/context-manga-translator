@@ -1047,6 +1047,7 @@
               "ocr": "paddle-ocr-vl-1.6",
               "renderer": "koharu-renderer",
               "segmenter": "comic-text-detector-seg",
+              "segmenter_binary_threshold": null,
               "translator": "llm",
               "unlimited_ocr_mode": "off",
               "unlimited_ocr_url": null
@@ -3036,6 +3037,15 @@
             "type": "string",
             "default": "comic-text-detector-seg"
           },
+          "segmenter_binary_threshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "Binary mask threshold override (0.0..=1.0) for the currently selected\n`segmenter` engine. `None` = use that engine's built-in default.",
+            "default": null
+          },
           "translator": {
             "type": "string",
             "default": "llm"
@@ -3118,6 +3128,14 @@
               "string",
               "null"
             ]
+          },
+          "segmenterBinaryThreshold": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "`Some(Some(x))` sets an override, `Some(None)` clears it back to the\nsegmenter's built-in default, `None` leaves the existing value as-is."
           },
           "translator": {
             "type": [
