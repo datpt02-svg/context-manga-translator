@@ -1036,6 +1036,10 @@
             ],
             "default": {
               "bubble_segmenter": "speech-bubble-segmentation",
+              "comic_text_bubble_detector_classes": [
+                "text_bubble",
+                "text_free"
+              ],
               "detector": "pp-doclayout-v3",
               "detector_confidence_threshold": null,
               "font_detector": "yuzumarker-font-detection",
@@ -2989,6 +2993,16 @@
             "type": "string",
             "default": "speech-bubble-segmentation"
           },
+          "comic_text_bubble_detector_classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "text_bubble",
+              "text_free"
+            ]
+          },
           "detector": {
             "type": "string",
             "default": "pp-doclayout-v3"
@@ -3051,6 +3065,15 @@
               "string",
               "null"
             ]
+          },
+          "comicTextBubbleDetectorClasses": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
           },
           "detector": {
             "type": [

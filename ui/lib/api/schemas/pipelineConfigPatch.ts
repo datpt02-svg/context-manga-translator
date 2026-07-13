@@ -8,6 +8,8 @@ export interface PipelineConfigPatch {
   /** @nullable */
   bubbleSegmenter?: string | null;
   /** @nullable */
+  comicTextBubbleDetectorClasses?: string[] | null;
+  /** @nullable */
   detector?: string | null;
   /**
      * `Some(Some(x))` sets an override, `Some(None)` clears it back to the

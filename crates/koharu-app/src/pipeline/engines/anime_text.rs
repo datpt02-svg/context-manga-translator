@@ -27,9 +27,11 @@ impl Engine for Model {
             .options
             .detector_confidence_threshold
             .unwrap_or(DEFAULT_CONFIDENCE_THRESHOLD);
-        let det = self
-            .0
-            .inference_with_thresholds(&image, confidence_threshold, DEFAULT_NMS_THRESHOLD)?;
+        let det = self.0.inference_with_thresholds(
+            &image,
+            confidence_threshold,
+            DEFAULT_NMS_THRESHOLD,
+        )?;
 
         let mut pairs: Vec<([f32; 4], TextData)> = det
             .text_blocks

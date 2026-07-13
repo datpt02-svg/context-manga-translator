@@ -89,6 +89,18 @@ pub struct PipelineConfig {
     /// `detector` engine. `None` = use that engine's built-in default.
     #[serde(default)]
     pub detector_confidence_threshold: Option<f32>,
+    #[serde(default = "default_comic_text_bubble_detector_classes")]
+    pub comic_text_bubble_detector_classes: Vec<String>,
+}
+
+const COMIC_TEXT_BUBBLE_DETECTOR_CLASSES: &[&str] = &["bubble", "text_bubble", "text_free"];
+const DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES: &[&str] = &["text_bubble", "text_free"];
+
+fn default_comic_text_bubble_detector_classes() -> Vec<String> {
+    DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES
+        .iter()
+        .map(|class| (*class).to_string())
+        .collect()
 }
 
 impl Default for PipelineConfig {
@@ -105,6 +117,7 @@ impl Default for PipelineConfig {
             unlimited_ocr_mode: UnlimitedOcrMode::Off,
             unlimited_ocr_url: None,
             detector_confidence_threshold: None,
+            comic_text_bubble_detector_classes: default_comic_text_bubble_detector_classes(),
         }
     }
 }
@@ -258,6 +271,9 @@ pub fn apply_patch(config: &mut AppConfig, patch: koharu_core::ConfigPatch) {
         if let Some(v) = p.detector_confidence_threshold {
             config.pipeline.detector_confidence_threshold = v.map(|x| x.clamp(0.0, 1.0));
         }
+        if let Some(v) = p.comic_text_bubble_detector_classes {
+            config.pipeline.comic_text_bubble_detector_classes = v;
+        }
     }
     if let Some(providers) = patch.providers {
         let mut new_providers = Vec::with_capacity(providers.len());
@@ -335,6 +351,9 @@ fn validate_pipeline_config(config: &mut AppConfig) -> bool {
         &defaults.renderer,
         Artifact::FinalRender,
     );
+    changed |= validate_comic_text_bubble_detector_classes(
+        &mut config.pipeline.comic_text_bubble_detector_classes,
+    );
 
     changed
 }
@@ -369,6 +388,24 @@ fn validate_engine_name(
     }
     *configured = default.to_string();
     true
+}
+
+fn validate_comic_text_bubble_detector_classes(configured: &mut Vec<String>) -> bool {
+    let original = configured.clone();
+    let mut normalized = Vec::new();
+    for class in configured.iter().map(|class| class.trim()) {
+        if COMIC_TEXT_BUBBLE_DETECTOR_CLASSES.contains(&class)
+            && !normalized.iter().any(|existing| existing == class)
+        {
+            normalized.push(class.to_string());
+        }
+    }
+    if normalized.is_empty() {
+        normalized = default_comic_text_bubble_detector_classes();
+    }
+    let changed = normalized != original;
+    *configured = normalized;
+    changed
 }
 
 // ---------------------------------------------------------------------------

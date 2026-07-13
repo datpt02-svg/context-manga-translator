@@ -278,14 +278,15 @@ pub async fn run(
                 blobs: &session.blobs,
                 service_url: fallback_url,
             };
-            let fallback_ops = match unlimited_ocr_fallback::apply_unlimited_ocr_fallback(fallback_ctx).await {
-                Ok(ops) => ops,
-                Err(e) => {
-                    tracing::warn!("SmartFallback on page {} failed: {e:#}", page_id);
-                    warning_count += 1;
-                    Vec::new()
-                }
-            };
+            let fallback_ops =
+                match unlimited_ocr_fallback::apply_unlimited_ocr_fallback(fallback_ctx).await {
+                    Ok(ops) => ops,
+                    Err(e) => {
+                        tracing::warn!("SmartFallback on page {} failed: {e:#}", page_id);
+                        warning_count += 1;
+                        Vec::new()
+                    }
+                };
             if !fallback_ops.is_empty() {
                 let batch = Op::Batch {
                     ops: fallback_ops,

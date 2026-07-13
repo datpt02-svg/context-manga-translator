@@ -50,7 +50,7 @@ pub struct EngineCtx<'a> {
 }
 
 /// Options threaded through a pipeline run.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PipelineRunOptions {
     pub target_language: Option<String>,
     pub system_prompt: Option<String>,
@@ -71,6 +71,27 @@ pub struct PipelineRunOptions {
     /// Confidence threshold override for the active detector engine.
     /// `None` = use that engine's built-in default.
     pub detector_confidence_threshold: Option<f32>,
+    pub comic_text_bubble_detector_classes: Vec<String>,
+}
+
+impl Default for PipelineRunOptions {
+    fn default() -> Self {
+        Self {
+            target_language: None,
+            system_prompt: None,
+            default_font: None,
+            text_node_ids: None,
+            region: None,
+            reading_order: None,
+            unlimited_ocr_mode: UnlimitedOcrMode::Off,
+            unlimited_ocr_url: None,
+            detector_confidence_threshold: None,
+            comic_text_bubble_detector_classes: vec![
+                "text_bubble".to_string(),
+                "text_free".to_string(),
+            ],
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

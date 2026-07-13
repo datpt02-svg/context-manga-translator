@@ -254,6 +254,8 @@ pub struct PipelineConfigPatch {
     /// detector's built-in default, `None` leaves the existing value as-is.
     #[serde(default, deserialize_with = "deserialize_double_option")]
     pub detector_confidence_threshold: Option<Option<f32>>,
+    #[serde(default)]
+    pub comic_text_bubble_detector_classes: Option<Vec<String>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +263,9 @@ pub struct PipelineConfigPatch {
 // ---------------------------------------------------------------------------
 
 /// Controls how the pipeline handles unlimited-OCR routing.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, ToSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum UnlimitedOcrMode {
     #[default]

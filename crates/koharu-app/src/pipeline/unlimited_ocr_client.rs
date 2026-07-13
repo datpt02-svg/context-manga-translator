@@ -78,7 +78,12 @@ impl UnlimitedOcrClient {
             .timeout(HEALTH_TIMEOUT)
             .send()
             .await
-            .with_context(|| format!("Unlimited-OCR health check failed (service at {})", self.base_url))?;
+            .with_context(|| {
+                format!(
+                    "Unlimited-OCR health check failed (service at {})",
+                    self.base_url
+                )
+            })?;
         Ok(())
     }
 

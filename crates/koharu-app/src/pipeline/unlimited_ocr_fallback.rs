@@ -5,16 +5,19 @@
 //! when `UnlimitedOcrMode::SmartFallback` is active.
 
 use anyhow::{Context, Result};
-use image::DynamicImage;
-use koharu_core::{NodeDataPatch, NodeId, NodeKind, NodePatch, Op, Page, PageId, Scene, TextData, TextDataPatch, TextDirection, TextTranslationContext};
-use koharu_ml::comic_text_detector::crop_text_block_bbox;
 use base64::Engine as _;
+use image::DynamicImage;
+use koharu_core::{
+    NodeDataPatch, NodeId, NodeKind, NodePatch, Op, Page, PageId, Scene, TextData, TextDataPatch,
+    TextDirection, TextTranslationContext,
+};
+use koharu_ml::comic_text_detector::crop_text_block_bbox;
 
 use crate::blobs::BlobStore;
+use crate::pipeline::ocr_quality::{OcrQualityInput, assess_ocr_quality};
 use crate::pipeline::unlimited_ocr_client::{
     UnlimitedCropImage, UnlimitedCropRequest, UnlimitedOcrClient,
 };
-use crate::pipeline::ocr_quality::{OcrQualityInput, assess_ocr_quality};
 
 /// Context struct mirroring the parts of `EngineCtx` that the fallback needs,
 /// kept separate so it can be called outside the engine framework.
@@ -51,7 +54,11 @@ pub async fn apply_unlimited_ocr_fallback(ctx: FallbackCtx<'_>) -> Result<Vec<Op
     tracing::info!(
         "SmartFallback selected {} of {} boxes on page {}",
         selected.len(),
-        page_ref.nodes.values().filter(|n| matches!(n.kind, NodeKind::Text(_))).count(),
+        page_ref
+            .nodes
+            .values()
+            .filter(|n| matches!(n.kind, NodeKind::Text(_)))
+            .count(),
         ctx.page,
     );
 
@@ -91,9 +98,7 @@ pub async fn apply_unlimited_ocr_fallback(ctx: FallbackCtx<'_>) -> Result<Vec<Op
     {
         Ok(r) => r,
         Err(e) => {
-            tracing::warn!(
-                "SmartFallback service call failed, keeping base OCR: {e:#}"
-            );
+            tracing::warn!("SmartFallback service call failed, keeping base OCR: {e:#}");
             return Ok(mark_uncertain_ops(ctx.page, &selected));
         }
     };
@@ -105,8 +110,10 @@ pub async fn apply_unlimited_ocr_fallback(ctx: FallbackCtx<'_>) -> Result<Vec<Op
     );
 
     // 5. Build ops — map response items by id
-    let mut item_map: std::collections::HashMap<String, &crate::pipeline::unlimited_ocr_client::UnlimitedOcrItem> =
-        std::collections::HashMap::new();
+    let mut item_map: std::collections::HashMap<
+        String,
+        &crate::pipeline::unlimited_ocr_client::UnlimitedOcrItem,
+    > = std::collections::HashMap::new();
     for item in &response.items {
         item_map.insert(item.id.clone(), item);
     }
@@ -214,7 +221,10 @@ fn is_suspicious(td: &TextData, tf: &koharu_core::Transform) -> bool {
 }
 
 /// Build ops that mark nodes uncertain without changing their text.
-fn mark_uncertain_ops(page: PageId, nodes: &[(NodeId, &koharu_core::Transform, &TextData)]) -> Vec<Op> {
+fn mark_uncertain_ops(
+    page: PageId,
+    nodes: &[(NodeId, &koharu_core::Transform, &TextData)],
+) -> Vec<Op> {
     nodes
         .iter()
         .map(|(node_id, _, _)| Op::UpdateNode {

@@ -117,10 +117,8 @@ async fn translate_with_rich_context(
     let prompt = serde_json::to_string_pretty(&payload)
         .context("failed to serialize translation payload")?;
 
-    let rich_system = system_prompt
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| {
-            "You are a professional Japanese-to-Vietnamese manga translator.\n\
+    let rich_system = system_prompt.map(|s| s.to_string()).unwrap_or_else(|| {
+        "You are a professional Japanese-to-Vietnamese manga translator.\n\
              Translate each Japanese manga text box naturally into Vietnamese.\n\
              Use reading order, previous/next text, position, and source direction as context.\n\
              If available, consider role (dialogue/narration/SFX), speaker hints, emotion hints,\n\
@@ -129,8 +127,8 @@ async fn translate_with_rich_context(
              Preserve tone, brevity, and manga style.\n\
              Return strict JSON only:\n\
              [\n  {\"id\":\"...\", \"translation\":\"...\"}\n]"
-                .to_string()
-        });
+            .to_string()
+    });
 
     let response = llm
         .translate_raw(&prompt, Some(&rich_system), target_language)
@@ -146,22 +144,21 @@ async fn translate_with_rich_context(
 /// - If JSON parse succeeds and all ids match, return by id.
 /// - If output length equals input length, fallback to positional index.
 /// - Otherwise fail.
-fn parse_translation_json(
-    response: &str,
-    expected_count: usize,
-) -> Result<Vec<(String, String)>> {
+fn parse_translation_json(response: &str, expected_count: usize) -> Result<Vec<(String, String)>> {
     // Try to find a JSON array in the response (LLMs sometimes wrap in markdown).
     let body = extract_json_array(response).unwrap_or(response.trim());
 
-    let parsed: Vec<Value> = serde_json::from_str(body)
-        .context("failed to parse LLM JSON response")?;
+    let parsed: Vec<Value> =
+        serde_json::from_str(body).context("failed to parse LLM JSON response")?;
 
     if parsed.is_empty() {
         anyhow::bail!("LLM returned empty translation array");
     }
 
     // Try id-based mapping first.
-    let all_have_ids = parsed.iter().all(|v| v.get("id").and_then(|i| i.as_str()).is_some());
+    let all_have_ids = parsed
+        .iter()
+        .all(|v| v.get("id").and_then(|i| i.as_str()).is_some());
     if all_have_ids {
         let result: Vec<(String, String)> = parsed
             .iter()
@@ -340,7 +337,13 @@ mod tests {
     fn text_node(id: NodeId, text: Option<&str>, x: f32, y: f32, w: f32, h: f32) -> Node {
         Node {
             id,
-            transform: Transform { x, y, width: w, height: h, rotation_deg: 0.0 },
+            transform: Transform {
+                x,
+                y,
+                width: w,
+                height: h,
+                rotation_deg: 0.0,
+            },
             visible: true,
             kind: NodeKind::Text(TextData {
                 text: text.map(str::to_string),
@@ -356,15 +359,19 @@ mod tests {
             {"id": "def", "translation": "world"}
         ]"#;
         let result = parse_translation_json(response, 2).unwrap();
-        assert_eq!(result, vec![
-            ("abc".to_string(), "hello".to_string()),
-            ("def".to_string(), "world".to_string()),
-        ]);
+        assert_eq!(
+            result,
+            vec![
+                ("abc".to_string(), "hello".to_string()),
+                ("def".to_string(), "world".to_string()),
+            ]
+        );
     }
 
     #[test]
     fn parse_json_extracted_from_markdown_fence() {
-        let response = "Here is the translation:\n```json\n[{\"id\":\"x\",\"translation\":\"test\"}]\n```\n";
+        let response =
+            "Here is the translation:\n```json\n[{\"id\":\"x\",\"translation\":\"test\"}]\n```\n";
         let result = parse_translation_json(response, 1).unwrap();
         assert_eq!(result, vec![("x".to_string(), "test".to_string())]);
     }
@@ -376,10 +383,13 @@ mod tests {
             {"translation": "second"}
         ]"#;
         let result = parse_translation_json(response, 2).unwrap();
-        assert_eq!(result, vec![
-            ("0".to_string(), "first".to_string()),
-            ("1".to_string(), "second".to_string()),
-        ]);
+        assert_eq!(
+            result,
+            vec![
+                ("0".to_string(), "first".to_string()),
+                ("1".to_string(), "second".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -398,7 +408,10 @@ mod tests {
     fn extract_json_array_detects_brackets() {
         assert_eq!(extract_json_array("[1,2,3]"), Some("[1,2,3]"));
         assert_eq!(extract_json_array("text [1] more"), Some("[1]"));
-        assert_eq!(extract_json_array("```json\n[{\"a\":1}]\n```"), Some("[{\"a\":1}]"));
+        assert_eq!(
+            extract_json_array("```json\n[{\"a\":1}]\n```"),
+            Some("[{\"a\":1}]")
+        );
     }
 
     #[test]

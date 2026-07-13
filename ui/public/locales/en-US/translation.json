@@ -436,6 +436,13 @@
     "detectorConfidenceThresholdDescription": "Lower values catch more text (including stylized SFX) but risk more false positives.",
     "detectorConfidenceThresholdDefault": "Default: {{value}}",
     "detectorConfidenceThresholdReset": "Reset to default",
+    "comicTextBubbleDetectorClasses": "Comic Text & Bubble Classes",
+    "comicTextBubbleDetectorClassesDescription": "Choose which ogkalu detector classes become text boxes.",
+    "comicTextBubbleDetectorClass": {
+      "bubble": "Bubble",
+      "text_bubble": "Text in bubble",
+      "text_free": "Free text / SFX"
+    },
     "keybinds": "Keybinds",
     "keybindsDescription": "Customize keyboard shortcuts for tools and actions.",
     "shortcutIncreaseBrushSize": "Increase Brush Size",

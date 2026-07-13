@@ -134,8 +134,12 @@ impl ComicTextDetector {
         let (image_tensor, resized_dimensions) = preprocess(image, &self.device, self.dtype)?;
         let (predictions, mask, shrink_threshold) = self.forward(&image_tensor)?;
 
-        let bboxes =
-            postprocess_yolo(&predictions, original_dimensions, resized_dimensions, threshold)?;
+        let bboxes = postprocess_yolo(
+            &predictions,
+            original_dimensions,
+            resized_dimensions,
+            threshold,
+        )?;
         let shrink_map = tensor_channel_to_gray_resized(
             &shrink_threshold.i((0, 0))?,
             original_dimensions.0,

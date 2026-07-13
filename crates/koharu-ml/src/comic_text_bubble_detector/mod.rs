@@ -16,6 +16,7 @@ use self::model::{RTDetrV2ForObjectDetection, RTDetrV2Outputs};
 const HF_REPO: &str = "ogkalu/comic-text-and-bubble-detector";
 const DEFAULT_CONFIDENCE_THRESHOLD: f32 = 0.3;
 const DETECTOR_NAME: &str = "comic-text-bubble-detector";
+const DEFAULT_TEXT_BLOCK_LABEL_IDS: &[usize] = &[1, 2];
 
 koharu_runtime::declare_hf_model_package!(
     id: "model:comic-text-bubble-detector:config",
@@ -95,6 +96,29 @@ impl ComicTextBubbleDetector {
         image: &DynamicImage,
         threshold: f32,
     ) -> Result<ComicTextBubbleDetection> {
+        self.inference_with_threshold_and_labels(image, threshold, DEFAULT_TEXT_BLOCK_LABEL_IDS)
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    pub fn inference_with_labels(
+        &self,
+        image: &DynamicImage,
+        text_block_label_ids: &[usize],
+    ) -> Result<ComicTextBubbleDetection> {
+        self.inference_with_threshold_and_labels(
+            image,
+            DEFAULT_CONFIDENCE_THRESHOLD,
+            text_block_label_ids,
+        )
+    }
+
+    #[instrument(level = "debug", skip_all)]
+    pub fn inference_with_threshold_and_labels(
+        &self,
+        image: &DynamicImage,
+        threshold: f32,
+        text_block_label_ids: &[usize],
+    ) -> Result<ComicTextBubbleDetection> {
         let started = Instant::now();
         let detections = self.slicer.process_slices_for_detection(image, |slice| {
             self.detect_single_image(slice, threshold)
@@ -103,7 +127,8 @@ impl ComicTextBubbleDetector {
             filter_and_fix_regions(detections, image.dimensions()),
             image.height(),
         );
-        let text_blocks = detections_to_text_blocks(image.dimensions(), &detections);
+        let text_blocks =
+            detections_to_text_blocks(image.dimensions(), &detections, text_block_label_ids);
 
         tracing::info!(
             width = image.width(),
@@ -520,11 +545,12 @@ fn post_process_object_detection(
 fn detections_to_text_blocks(
     image_dimensions: (u32, u32),
     detections: &[ComicTextBubbleRegion],
+    text_block_label_ids: &[usize],
 ) -> Vec<TextRegion> {
     let text_boxes = merge_text_regions(
         detections
             .iter()
-            .filter(|region| region.is_text())
+            .filter(|region| text_block_label_ids.contains(&region.label_id))
             .cloned()
             .collect::<Vec<_>>(),
     );
@@ -1054,5 +1080,29 @@ mod tests {
         ];
         let merged = merge_slice_regions(regions, 500);
         assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn detections_to_text_blocks_uses_selected_labels() {
+        let regions = vec![
+            ComicTextBubbleRegion {
+                label_id: 0,
+                label: "bubble".to_string(),
+                score: 0.8,
+                bbox: [10.0, 10.0, 100.0, 100.0],
+            },
+            ComicTextBubbleRegion {
+                label_id: 1,
+                label: "text_bubble".to_string(),
+                score: 0.9,
+                bbox: [30.0, 30.0, 60.0, 60.0],
+            },
+        ];
+
+        let blocks = detections_to_text_blocks((200, 200), &regions, &[0]);
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].x, 10.0);
+        assert_eq!(blocks[0].width, 90.0);
     }
 }

@@ -11,6 +11,7 @@ import type { UnlimitedOcrMode } from './unlimitedOcrMode';
  */
 export interface PipelineConfig {
   bubble_segmenter?: string;
+  comic_text_bubble_detector_classes?: string[];
   detector?: string;
   /**
      * Confidence threshold override (0.0..=1.0) for the currently selected

@@ -41,8 +41,11 @@ impl Engine for Model {
 
         // Build crop images
         let mut crop_images: Vec<UnlimitedCropImage> = Vec::with_capacity(texts.len());
-        let mut nodes: Vec<(koharu_core::NodeId, &koharu_core::Transform, &koharu_core::TextData)> =
-            Vec::with_capacity(texts.len());
+        let mut nodes: Vec<(
+            koharu_core::NodeId,
+            &koharu_core::Transform,
+            &koharu_core::TextData,
+        )> = Vec::with_capacity(texts.len());
 
         for (node_id, tf, td) in &texts {
             let region = text_node_to_region(tf, td);
@@ -76,8 +79,10 @@ impl Engine for Model {
             .context("Unlimited-OCR batch request failed")?;
 
         // Build id → item map
-        let mut item_map: std::collections::HashMap<String, &crate::pipeline::unlimited_ocr_client::UnlimitedOcrItem> =
-            std::collections::HashMap::new();
+        let mut item_map: std::collections::HashMap<
+            String,
+            &crate::pipeline::unlimited_ocr_client::UnlimitedOcrItem,
+        > = std::collections::HashMap::new();
         for item in &response.items {
             item_map.insert(item.id.clone(), item);
         }

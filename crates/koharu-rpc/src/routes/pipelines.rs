@@ -84,16 +84,15 @@ async fn start_pipeline(
     let mut steps = req.steps.clone();
     if req.unlimited_ocr_mode == UnlimitedOcrMode::Full {
         for step in steps.iter_mut() {
-            if *step == "paddle-ocr-vl-1.6"
-                || *step == "manga-ocr"
-                || *step == "mit48px-ocr"
-            {
+            if *step == "paddle-ocr-vl-1.6" || *step == "manga-ocr" || *step == "mit48px-ocr" {
                 *step = "unlimited-ocr".to_string();
             }
         }
     }
 
-    let detector_confidence_threshold = app.config.load().pipeline.detector_confidence_threshold;
+    let pipeline_config = app.config.load().pipeline.clone();
+    let detector_confidence_threshold = pipeline_config.detector_confidence_threshold;
+    let comic_text_bubble_detector_classes = pipeline_config.comic_text_bubble_detector_classes;
 
     let spec = PipelineSpec {
         scope: match req.pages {
@@ -111,6 +110,7 @@ async fn start_pipeline(
             unlimited_ocr_mode: req.unlimited_ocr_mode,
             unlimited_ocr_url: req.unlimited_ocr_url,
             detector_confidence_threshold,
+            comic_text_bubble_detector_classes,
         },
     };
 

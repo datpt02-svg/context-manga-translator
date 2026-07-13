@@ -47,7 +47,9 @@ pub fn build_translation_blocks(
     // Collect: (id, bbox, text_data)
     let mut items: Vec<(NodeId, [f32; 4], &koharu_core::TextData)> = Vec::new();
     for (id, node) in &page_ref.nodes {
-        let NodeKind::Text(t) = &node.kind else { continue };
+        let NodeKind::Text(t) = &node.kind else {
+            continue;
+        };
         if t.text.as_deref().is_none_or(|s| s.trim().is_empty()) {
             continue;
         }
@@ -108,10 +110,13 @@ pub fn build_translation_blocks(
         };
         let position = format!("{}-{}", v_pos, h_pos);
 
-        let source_direction = td.source_direction.map(|d| match d {
-            TextDirection::Horizontal => "horizontal",
-            TextDirection::Vertical => "vertical",
-        }.to_string());
+        let source_direction = td.source_direction.map(|d| {
+            match d {
+                TextDirection::Horizontal => "horizontal",
+                TextDirection::Vertical => "vertical",
+            }
+            .to_string()
+        });
 
         let previous_text = if i > 0 {
             items[i - 1].2.text.clone()
@@ -135,10 +140,22 @@ pub fn build_translation_blocks(
                 ocr_confidence: td.ocr_confidence,
                 ocr_uncertain: td.ocr_uncertain,
                 role: td.translation_context.as_ref().and_then(|c| c.role.clone()),
-                speaker_hint: td.translation_context.as_ref().and_then(|c| c.speaker_hint.clone()),
-                emotion_hint: td.translation_context.as_ref().and_then(|c| c.emotion_hint.clone()),
-                visual_hint: td.translation_context.as_ref().and_then(|c| c.visual_hint.clone()),
-                translation_note: td.translation_context.as_ref().and_then(|c| c.translation_note.clone()),
+                speaker_hint: td
+                    .translation_context
+                    .as_ref()
+                    .and_then(|c| c.speaker_hint.clone()),
+                emotion_hint: td
+                    .translation_context
+                    .as_ref()
+                    .and_then(|c| c.emotion_hint.clone()),
+                visual_hint: td
+                    .translation_context
+                    .as_ref()
+                    .and_then(|c| c.visual_hint.clone()),
+                translation_note: td
+                    .translation_context
+                    .as_ref()
+                    .and_then(|c| c.translation_note.clone()),
                 previous_text,
                 next_text,
             },
@@ -162,17 +179,16 @@ mod tests {
         PageId(Uuid::from_u128(1))
     }
 
-    fn text_node(
-        id: NodeId,
-        text: Option<&str>,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-    ) -> Node {
+    fn text_node(id: NodeId, text: Option<&str>, x: f32, y: f32, w: f32, h: f32) -> Node {
         Node {
             id,
-            transform: Transform { x, y, width: w, height: h, rotation_deg: 0.0 },
+            transform: Transform {
+                x,
+                y,
+                width: w,
+                height: h,
+                rotation_deg: 0.0,
+            },
             visible: true,
             kind: NodeKind::Text(TextData {
                 text: text.map(str::to_string),
@@ -210,7 +226,14 @@ mod tests {
     #[test]
     fn include_bbox() {
         let scene = scene_with(
-            vec![text_node(node_id(1), Some("hello"), 10.0, 20.0, 100.0, 30.0)],
+            vec![text_node(
+                node_id(1),
+                Some("hello"),
+                10.0,
+                20.0,
+                100.0,
+                30.0,
+            )],
             500,
             500,
         );
@@ -222,7 +245,14 @@ mod tests {
     fn compute_position_correctly() {
         // bbox centered at (55, 25) on page 500×500
         let scene = scene_with(
-            vec![text_node(node_id(1), Some("left-top"), 0.0, 0.0, 50.0, 50.0)],
+            vec![text_node(
+                node_id(1),
+                Some("left-top"),
+                0.0,
+                0.0,
+                50.0,
+                50.0,
+            )],
             500,
             500,
         );
@@ -231,7 +261,14 @@ mod tests {
 
         // bbox centered at (350, 350) → bottom-right
         let scene2 = scene_with(
-            vec![text_node(node_id(2), Some("br"), 300.0, 300.0, 100.0, 100.0)],
+            vec![text_node(
+                node_id(2),
+                Some("br"),
+                300.0,
+                300.0,
+                100.0,
+                100.0,
+            )],
             500,
             500,
         );
@@ -271,8 +308,7 @@ mod tests {
             100,
             100,
         );
-        let blocks =
-            build_translation_blocks(&scene, page_id(), Some(&allowed), None);
+        let blocks = build_translation_blocks(&scene, page_id(), Some(&allowed), None);
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].1.text, "keep");
     }

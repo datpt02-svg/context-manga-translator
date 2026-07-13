@@ -22,6 +22,7 @@ import {
   LogInIcon,
   LogOutIcon,
   SparklesIcon,
+  ChevronDownIcon,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -46,6 +47,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Input } from '@/components/ui/input'
 import { Kbd } from '@/components/ui/kbd'
 import { Label } from '@/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -119,6 +121,10 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
       unlimitedOcrMode: cfg.pipeline.unlimited_ocr_mode ?? null,
       unlimitedOcrUrl: cfg.pipeline.unlimited_ocr_url ?? null,
       detectorConfidenceThreshold: cfg.pipeline.detector_confidence_threshold ?? null,
+      comicTextBubbleDetectorClasses:
+        cfg.pipeline.comic_text_bubble_detector_classes ?? [
+          ...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES,
+        ],
     }
   }
   if (cfg.providers) {
@@ -508,6 +514,12 @@ const DETECTOR_DEFAULT_THRESHOLD: Record<string, number> = {
   'anime-text': 0.25,
 }
 
+const DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES = ['text_bubble', 'text_free'] as const
+const COMIC_TEXT_BUBBLE_DETECTOR_CLASSES = [
+  'bubble',
+  ...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES,
+] as const
+
 function EnginesPane({
   catalog,
   pipeline,
@@ -522,6 +534,8 @@ function EnginesPane({
   const currentDetector = pipeline.detector ?? catalog.detectors[0]?.id ?? ''
   const detectorDefaultThreshold = DETECTOR_DEFAULT_THRESHOLD[currentDetector]
   const detectorThreshold = pipeline.detector_confidence_threshold ?? detectorDefaultThreshold
+  const comicTextBubbleDetectorClasses =
+    pipeline.comic_text_bubble_detector_classes ?? [...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES]
 
   // Local draft value so dragging the slider feels smooth (no network
   // round-trip per pixel). Only persisted via onValueCommit on release.
@@ -629,6 +643,72 @@ function EnginesPane({
                   {t('settings.detectorConfidenceThresholdDefault', {
                     value: detectorDefaultThreshold.toFixed(2),
                   })}
+                </p>
+              </div>
+            )}
+            {key === 'detector' && currentDetector === 'comic-text-bubble-detector' && (
+              <div className='space-y-1.5 pt-1 pl-1'>
+                <Label className='text-xs text-muted-foreground'>
+                  {t('settings.comicTextBubbleDetectorClasses')}
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      className='h-9 w-full justify-between text-left text-xs font-normal'
+                    >
+                      <span className='truncate'>
+                        {comicTextBubbleDetectorClasses
+                          .map((className) =>
+                            t(`settings.comicTextBubbleDetectorClass.${className}`),
+                          )
+                          .join(', ')}
+                      </span>
+                      <ChevronDownIcon className='size-4 shrink-0 opacity-50' />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align='start'
+                    className='min-w-(--radix-popover-trigger-width) p-1'
+                  >
+                    {COMIC_TEXT_BUBBLE_DETECTOR_CLASSES.map((className) => {
+                      const checked = comicTextBubbleDetectorClasses.includes(className)
+                      const disabled = checked && comicTextBubbleDetectorClasses.length === 1
+                      return (
+                        <label
+                          key={className}
+                          className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
+                            disabled
+                              ? 'cursor-not-allowed opacity-50'
+                              : 'cursor-pointer hover:bg-accent'
+                          }`}
+                        >
+                          <input
+                            type='checkbox'
+                            className='size-4 accent-primary'
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => {
+                              const nextClasses = checked
+                                ? comicTextBubbleDetectorClasses.filter((item) => item !== className)
+                                : [...comicTextBubbleDetectorClasses, className]
+                              if (nextClasses.length) {
+                                onChange({
+                                  ...pipeline,
+                                  comic_text_bubble_detector_classes: nextClasses,
+                                })
+                              }
+                            }}
+                          />
+                          <span>{t(`settings.comicTextBubbleDetectorClass.${className}`)}</span>
+                        </label>
+                      )
+                    })}
+                  </PopoverContent>
+                </Popover>
+                <p className='text-xs text-muted-foreground'>
+                  {t('settings.comicTextBubbleDetectorClassesDescription')}
                 </p>
               </div>
             )}

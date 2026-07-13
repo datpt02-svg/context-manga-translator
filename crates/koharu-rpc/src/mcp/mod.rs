@@ -195,6 +195,12 @@ impl KoharuServer {
                 unlimited_ocr_mode: Default::default(),
                 unlimited_ocr_url: None,
                 detector_confidence_threshold: None,
+                comic_text_bubble_detector_classes: app
+                    .config
+                    .load()
+                    .pipeline
+                    .comic_text_bubble_detector_classes
+                    .clone(),
             },
         };
         let job_id = Uuid::new_v4().to_string();

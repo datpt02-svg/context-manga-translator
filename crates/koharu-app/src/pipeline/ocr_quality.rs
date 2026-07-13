@@ -247,7 +247,11 @@ mod tests {
             ..default_input()
         });
         assert!(report.uncertain);
-        assert!(report.reasons.contains(&OcrQualityReason::LowDetectorConfidence));
+        assert!(
+            report
+                .reasons
+                .contains(&OcrQualityReason::LowDetectorConfidence)
+        );
     }
 
     #[test]
@@ -269,7 +273,11 @@ mod tests {
             ..default_input()
         });
         assert!(report.uncertain);
-        assert!(report.reasons.contains(&OcrQualityReason::TooShortForLargeBox));
+        assert!(
+            report
+                .reasons
+                .contains(&OcrQualityReason::TooShortForLargeBox)
+        );
     }
 
     #[test]

@@ -21,10 +21,20 @@ use tokio::sync::{mpsc, oneshot};
 
 const DETECTOR_NAME: &str = "comic-text-bubble-detector";
 
+fn class_to_label_id(class: &str) -> Option<usize> {
+    match class {
+        "bubble" => Some(0),
+        "text_bubble" => Some(1),
+        "text_free" => Some(2),
+        _ => None,
+    }
+}
+
 // 1. Define the communication protocol
 struct DetectMessage {
     image: image::DynamicImage,
     threshold: Option<f32>,
+    text_block_label_ids: Vec<usize>,
     respond_to: oneshot::Sender<Result<ComicTextBubbleDetection>>,
 }
 
@@ -38,6 +48,15 @@ impl Engine for Model {
     async fn run(&self, ctx: EngineCtx<'_>) -> Result<Vec<Op>> {
         let image = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
         let threshold = ctx.options.detector_confidence_threshold;
+        let mut text_block_label_ids: Vec<_> = ctx
+            .options
+            .comic_text_bubble_detector_classes
+            .iter()
+            .filter_map(|class| class_to_label_id(class))
+            .collect();
+        if text_block_label_ids.is_empty() {
+            text_block_label_ids = vec![1, 2];
+        }
 
         // Create a one-time return channel
         let (resp_tx, resp_rx) = oneshot::channel();
@@ -48,6 +67,7 @@ impl Engine for Model {
             .send(DetectMessage {
                 image,
                 threshold,
+                text_block_label_ids,
                 respond_to: resp_tx,
             })
             .await
@@ -109,10 +129,12 @@ inventory::submit! {
                     // Listen continuously for pipeline requests
                     while let Some(msg) = rx.recv().await {
                         let result = match msg.threshold {
-                            Some(threshold) => {
-                                detector.inference_with_threshold(&msg.image, threshold)
-                            }
-                            None => detector.inference(&msg.image),
+                            Some(threshold) => detector.inference_with_threshold_and_labels(
+                                &msg.image,
+                                threshold,
+                                &msg.text_block_label_ids,
+                            ),
+                            None => detector.inference_with_labels(&msg.image, &msg.text_block_label_ids),
                         };
                         let _ = msg.respond_to.send(result);
                     }
