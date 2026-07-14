@@ -20,4 +20,5 @@ pub mod pp_doclayout;
 pub mod renderer;
 pub mod support;
 pub mod unlimited_ocr;
+pub mod vllm_ocr;
 pub mod yuzumarker_font;

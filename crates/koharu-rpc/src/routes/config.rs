@@ -105,6 +105,9 @@ fn upsert_provider_secret(config: &mut AppConfig, id: &str, secret: Option<&str>
             id: id.to_string(),
             base_url: None,
             api_key: redacted,
+            model: None,
+            max_tokens: None,
+            temperature: None,
         });
     }
 }

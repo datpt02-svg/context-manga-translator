@@ -29,12 +29,6 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { useTranslation } from 'react-i18next'
 
 import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from '@/components/ui/accordion'
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -126,6 +120,8 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
         cfg.pipeline.comic_text_bubble_detector_classes ?? [
           ...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES,
         ],
+      vllmOcrTarget: cfg.pipeline.vllm_ocr_target ?? null,
+      vllmOcrMaxTokens: cfg.pipeline.vllm_ocr_max_tokens ?? null,
     }
   }
   if (cfg.providers) {
@@ -146,9 +142,8 @@ const GITHUB_REPO = 'mayocream/koharu'
 
 const TABS = [
   { id: 'appearance', icon: PaletteIcon, labelKey: 'settings.appearance' },
+  { id: 'models', icon: SparklesIcon, labelKey: 'settings.models' },
   { id: 'engines', icon: CpuIcon, labelKey: 'settings.engines' },
-  { id: 'providers', icon: KeyIcon, labelKey: 'settings.apiKeys' },
-  { id: 'ai', icon: SparklesIcon, labelKey: 'settings.ai' },
   { id: 'keybinds', icon: KeyboardIcon, labelKey: 'settings.keybinds' },
   { id: 'runtime', icon: HardDriveIcon, labelKey: 'settings.runtime' },
   { id: 'about', icon: InfoIcon, labelKey: 'settings.about' },
@@ -363,9 +358,8 @@ export function SettingsDialog({
                   }}
                 />
               )}
-              {tab === 'providers' && (
-                <ProvidersPane
-                  catalogs={providerCatalogs}
+              {tab === 'models' && appConfig && (
+                <ModelsPane
                   config={appConfig}
                   drafts={apiKeyDrafts}
                   onBaseUrlChange={(id, v) =>
@@ -375,6 +369,27 @@ export function SettingsDialog({
                     }))
                   }
                   onBaseUrlBlur={() => appConfig && void persistConfig(appConfig)}
+                  onModelChange={(id, v) => {
+                    upsertProvider(id, (p) => ({
+                      ...p,
+                      model: v || null,
+                    }))
+                    appConfig && void persistConfig(appConfig)
+                  }}
+                  onMaxTokensChange={(id, v) => {
+                    upsertProvider(id, (p) => ({
+                      ...p,
+                      max_tokens: v || null,
+                    }))
+                    appConfig && void persistConfig(appConfig)
+                  }}
+                  onTemperatureChange={(id, v) => {
+                    upsertProvider(id, (p) => ({
+                      ...p,
+                      temperature: v || null,
+                    }))
+                    appConfig && void persistConfig(appConfig)
+                  }}
                   onApiKeyChange={(id, v) => setApiKeyDrafts((c) => ({ ...c, [id]: v }))}
                   onSaveKey={(id) => {
                     const key = apiKeyDrafts[id]?.trim()
@@ -797,116 +812,200 @@ function EnginesPane({
   )
 }
 
-function ProvidersPane({
-  catalogs,
+function ModelsPane({
   config,
   drafts,
   onBaseUrlChange,
   onBaseUrlBlur,
+  onModelChange,
+  onMaxTokensChange,
+  onTemperatureChange,
   onApiKeyChange,
   onSaveKey,
   onClearKey,
 }: {
-  catalogs: LlmProviderCatalog[]
-  config: UpdateConfigBody | null
+  config: UpdateConfigBody
   drafts: Record<string, string>
   onBaseUrlChange: (id: string, v: string) => void
   onBaseUrlBlur: () => void
+  onModelChange: (id: string, v: string) => void
+  onMaxTokensChange: (id: string, v: string) => void
+  onTemperatureChange: (id: string, v: string) => void
   onApiKeyChange: (id: string, v: string) => void
   onSaveKey: (id: string) => void
   onClearKey: (id: string) => void
 }) {
   const { t } = useTranslation()
 
-  if (!catalogs.length)
-    return (
-      <p className='py-12 text-center text-sm text-muted-foreground'>
-        {t('settings.loadingProviders')}
-      </p>
-    )
+  return (
+    <div className='space-y-8'>
+      {/* ── LLM section ── */}
+      <ProviderSettingsCard
+        id='openai-compatible'
+        title={t('settings.llmSettings')}
+        description={t('settings.modelsDescription')}
+        config={config}
+        baseUrlPlaceholder='http://127.0.0.1:8000/v1'
+        showTemperature
+        modelPlaceholder='e.g. qwen2.5-14b-instruct'
+        drafts={drafts}
+        onBaseUrlChange={onBaseUrlChange}
+        onBaseUrlBlur={onBaseUrlBlur}
+        onModelChange={onModelChange}
+        onMaxTokensChange={onMaxTokensChange}
+        onTemperatureChange={onTemperatureChange}
+        onApiKeyChange={onApiKeyChange}
+        onSaveKey={onSaveKey}
+        onClearKey={onClearKey}
+      />
+
+      {/* ── vLLM OCR section ── */}
+      <ProviderSettingsCard
+        id='vllm-ocr'
+        title={t('settings.vllmSettings')}
+        config={config}
+        baseUrlPlaceholder='http://127.0.0.1:8000/v1'
+        modelPlaceholder='e.g. qwen2.5-vl-7b-instruct'
+        showTemperature
+        drafts={drafts}
+        onBaseUrlChange={onBaseUrlChange}
+        onBaseUrlBlur={onBaseUrlBlur}
+        onModelChange={onModelChange}
+        onMaxTokensChange={onMaxTokensChange}
+        onTemperatureChange={onTemperatureChange}
+        onApiKeyChange={onApiKeyChange}
+        onSaveKey={onSaveKey}
+        onClearKey={onClearKey}
+      />
+    </div>
+  )
+}
+
+/** Reusable card: base URL, model, API key, max tokens, optional temperature. */
+function ProviderSettingsCard({
+  id,
+  title,
+  description,
+  config,
+  baseUrlPlaceholder,
+  modelPlaceholder,
+  showTemperature,
+  drafts,
+  onBaseUrlChange,
+  onBaseUrlBlur,
+  onModelChange,
+  onMaxTokensChange,
+  onTemperatureChange,
+  onApiKeyChange,
+  onSaveKey,
+  onClearKey,
+}: {
+  id: string
+  title: string
+  description?: string
+  config: UpdateConfigBody
+  baseUrlPlaceholder?: string
+  modelPlaceholder?: string
+  showTemperature?: boolean
+  drafts: Record<string, string>
+  onBaseUrlChange: (id: string, v: string) => void
+  onBaseUrlBlur: () => void
+  onModelChange: (id: string, v: string) => void
+  onMaxTokensChange: (id: string, v: string) => void
+  onTemperatureChange: (id: string, v: string) => void
+  onApiKeyChange: (id: string, v: string) => void
+  onSaveKey: (id: string) => void
+  onClearKey: (id: string) => void
+}) {
+  const { t } = useTranslation()
+  const cfg = config.providers?.find((p) => p.id === id)
+  const draft = drafts[id] ?? ''
+  const hasDraft = draft.trim().length > 0
 
   return (
-    <div className='space-y-6'>
-      <Section title={t('settings.apiKeys')} description={t('settings.providersDescription')}>
-        <Accordion type='multiple' className='-mx-1'>
-          {catalogs.map((provider) => {
-            const cfg = config?.providers?.find((p) => p.id === provider.id)
-            const draft = drafts[provider.id] ?? ''
-            const hasDraft = draft.trim().length > 0
-            const statusColor =
-              provider.status === 'ready'
-                ? 'bg-green-500'
-                : provider.status === 'missing_configuration'
-                  ? 'bg-amber-400'
-                  : provider.status === 'discovery_failed'
-                    ? 'bg-red-500'
-                    : 'bg-muted-foreground'
+    <Section title={title} description={description}>
+      <div className='space-y-3'>
+        {/* Base URL */}
+        <div className='space-y-1.5'>
+          <Label className='text-xs'>{t('settings.baseUrl')}</Label>
+          <Input
+            type='url'
+            value={cfg?.base_url ?? ''}
+            onChange={(e) => onBaseUrlChange(id, e.target.value)}
+            onBlur={onBaseUrlBlur}
+            placeholder={baseUrlPlaceholder ?? 'https://api.example.com/v1'}
+          />
+        </div>
 
-            return (
-              <AccordionItem key={provider.id} value={provider.id} className='border-border'>
-                <AccordionTrigger className='px-1 py-3 hover:no-underline'>
-                  <div className='flex items-center gap-2.5'>
-                    <span className={`size-2 shrink-0 rounded-full ${statusColor}`} />
-                    <span className='text-sm font-medium'>{provider.name}</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className='space-y-4 px-1 pt-1 pb-4'>
-                  {provider.error && (
-                    <p className='text-xs text-muted-foreground'>{provider.error}</p>
-                  )}
+        {/* Model */}
+        <div className='space-y-1.5'>
+          <Label className='text-xs'>{t('settings.model')}</Label>
+          <Input
+            value={cfg?.model ?? ''}
+            onChange={(e) => onModelChange(id, e.target.value)}
+            placeholder={modelPlaceholder ?? 'model-id'}
+          />
+        </div>
 
-                  {provider.requiresBaseUrl && (
-                    <div className='space-y-1.5'>
-                      <Label className='text-xs'>{t('settings.localLlmBaseUrl')}</Label>
-                      <Input
-                        type='url'
-                        value={cfg?.base_url ?? ''}
-                        onChange={(e) => onBaseUrlChange(provider.id, e.target.value)}
-                        onBlur={onBaseUrlBlur}
-                        placeholder='https://api.example.com/v1'
-                      />
-                    </div>
-                  )}
+        {/* API key */}
+        <div className='space-y-1.5'>
+          <Label className='text-xs'>{t('settings.apiKey')}</Label>
+          <div className='flex gap-2'>
+            <Input
+              type='password'
+              value={draft}
+              onChange={(e) => onApiKeyChange(id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && hasDraft) onSaveKey(id)
+              }}
+              placeholder={
+                cfg?.api_key === '[REDACTED]'
+                  ? t('settings.apiKeyPlaceholderStored')
+                  : t('settings.apiKeyPlaceholderEmpty')
+              }
+              className='[&::-ms-reveal]:hidden'
+            />
+            {hasDraft ? (
+              <Button size='sm' onClick={() => onSaveKey(id)}>
+                {t('settings.apiKeySave')}
+              </Button>
+            ) : cfg?.api_key === '[REDACTED]' ? (
+              <Button variant='destructive' size='sm' onClick={() => onClearKey(id)}>
+                {t('settings.apiKeyClear')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
 
-                  <div className='space-y-1.5'>
-                    <Label className='text-xs'>{t('settings.apiKey')}</Label>
-                    <div className='flex gap-2'>
-                      <Input
-                        type='password'
-                        value={draft}
-                        onChange={(e) => onApiKeyChange(provider.id, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && hasDraft) onSaveKey(provider.id)
-                        }}
-                        placeholder={
-                          cfg?.api_key === '[REDACTED]'
-                            ? t('settings.apiKeyPlaceholderStored')
-                            : t('settings.apiKeyPlaceholderEmpty')
-                        }
-                        className='[&::-ms-reveal]:hidden'
-                      />
-                      {hasDraft ? (
-                        <Button size='sm' onClick={() => onSaveKey(provider.id)}>
-                          {t('settings.apiKeySave')}
-                        </Button>
-                      ) : cfg?.api_key === '[REDACTED]' ? (
-                        <Button
-                          variant='destructive'
-                          size='sm'
-                          onClick={() => onClearKey(provider.id)}
-                        >
-                          {t('settings.apiKeyClear')}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            )
-          })}
-        </Accordion>
-      </Section>
-    </div>
+        {/* Max tokens */}
+        <div className='space-y-1.5'>
+          <Label className='text-xs'>{t('settings.maxTokens')}</Label>
+          <Input
+            type='number'
+            min={1}
+            value={cfg?.max_tokens ?? ''}
+            onChange={(e) => onMaxTokensChange(id, e.target.value)}
+            placeholder='256'
+          />
+        </div>
+
+        {/* Temperature */}
+        {(showTemperature || id === 'openai-compatible') && (
+          <div className='space-y-1.5'>
+            <Label className='text-xs'>{t('settings.temperature')}</Label>
+            <Input
+              type='number'
+              min={0}
+              max={2}
+              step={0.1}
+              value={cfg?.temperature ?? ''}
+              onChange={(e) => onTemperatureChange(id, e.target.value)}
+              placeholder='0.8'
+            />
+          </div>
+        )}
+      </div>
+    </Section>
   )
 }
 

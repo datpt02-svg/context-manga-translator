@@ -3397,6 +3397,27 @@
           },
           "id": {
             "type": "string"
+          },
+          "max_tokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "temperature": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
           }
         }
       },
@@ -3417,10 +3438,35 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "`None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set."
           },
           "id": {
             "type": "string"
+          },
+          "maxTokens": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "`None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.",
+            "minimum": 0
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set."
+          },
+          "temperature": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "`None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set."
           }
         }
       },
@@ -3648,7 +3694,15 @@
             "description": "Optional text-node ids for engines that can operate on individual blocks."
           },
           "unlimitedOcrMode": {
-            "$ref": "#/components/schemas/UnlimitedOcrMode"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UnlimitedOcrMode",
+                "description": "`None` = fall back to saved config."
+              }
+            ]
           },
           "unlimitedOcrUrl": {
             "type": [

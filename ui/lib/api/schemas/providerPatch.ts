@@ -9,7 +9,26 @@ export interface ProviderPatch {
      * @nullable
      */
   apiKey?: string | null;
-  /** @nullable */
+  /**
+     * `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+     * @nullable
+     */
   baseUrl?: string | null;
   id: string;
+  /**
+     * `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+     * @minimum 0
+     * @nullable
+     */
+  maxTokens?: number | null;
+  /**
+     * `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+     * @nullable
+     */
+  model?: string | null;
+  /**
+     * `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+     * @nullable
+     */
+  temperature?: number | null;
 }

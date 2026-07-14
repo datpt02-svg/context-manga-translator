@@ -75,6 +75,16 @@ pub struct PipelineRunOptions {
     /// `None` = use that engine's built-in default.
     pub segmenter_binary_threshold: Option<f32>,
     pub comic_text_bubble_detector_classes: Vec<String>,
+    /// vLLM OCR base URL (resolved from provider config).
+    pub vllm_ocr_base_url: Option<String>,
+    /// vLLM OCR model (resolved from provider config).
+    pub vllm_ocr_model: Option<String>,
+    /// vLLM OCR API key (resolved from provider config).
+    pub vllm_ocr_api_key: Option<String>,
+    /// Max tokens for vLLM OCR requests. `None` = engine default (256).
+    pub vllm_ocr_max_tokens: Option<u32>,
+    /// Temperature for vLLM OCR requests.
+    pub vllm_ocr_temperature: Option<f64>,
 }
 
 impl Default for PipelineRunOptions {
@@ -94,6 +104,11 @@ impl Default for PipelineRunOptions {
                 "text_bubble".to_string(),
                 "text_free".to_string(),
             ],
+            vllm_ocr_base_url: None,
+            vllm_ocr_model: None,
+            vllm_ocr_api_key: None,
+            vllm_ocr_max_tokens: None,
+            vllm_ocr_temperature: None,
         }
     }
 }

@@ -50,8 +50,9 @@ pub struct StartPipelineRequest {
     pub default_font: Option<String>,
     #[serde(default)]
     pub reading_order: Option<ReadingOrder>,
+    /// `None` = fall back to saved config.
     #[serde(default)]
-    pub unlimited_ocr_mode: UnlimitedOcrMode,
+    pub unlimited_ocr_mode: Option<UnlimitedOcrMode>,
     #[serde(default)]
     pub unlimited_ocr_url: Option<String>,
 }
@@ -80,9 +81,15 @@ async fn start_pipeline(
         pipeline::Registry::find(id).map_err(|e| ApiError::bad_request(format!("{e:#}")))?;
     }
 
+    let app_config = app.config.load();
+    let pipeline_config = app_config.pipeline.clone();
+
     // Full mode: replace OCR engine step with unlimited-ocr
     let mut steps = req.steps.clone();
-    if req.unlimited_ocr_mode == UnlimitedOcrMode::Full {
+    let unlimited_ocr_mode = req
+        .unlimited_ocr_mode
+        .unwrap_or(pipeline_config.unlimited_ocr_mode);
+    if unlimited_ocr_mode == UnlimitedOcrMode::Full {
         for step in steps.iter_mut() {
             if *step == "paddle-ocr-vl-1.6" || *step == "manga-ocr" || *step == "mit48px-ocr" {
                 *step = "unlimited-ocr".to_string();
@@ -90,10 +97,24 @@ async fn start_pipeline(
         }
     }
 
-    let pipeline_config = app.config.load().pipeline.clone();
     let detector_confidence_threshold = pipeline_config.detector_confidence_threshold;
     let segmenter_binary_threshold = pipeline_config.segmenter_binary_threshold;
     let comic_text_bubble_detector_classes = pipeline_config.comic_text_bubble_detector_classes;
+
+    // Resolve vLLM OCR provider settings from provider `vllm-ocr`.
+    let vllm_provider = app_config.providers.iter().find(|p| p.id == "vllm-ocr");
+    let vllm_ocr_base_url = vllm_provider.and_then(|p| p.base_url.clone());
+    let vllm_ocr_model = vllm_provider.and_then(|p| p.model.clone());
+    let vllm_ocr_api_key = vllm_provider
+        .and_then(|p| p.api_key.as_ref())
+        .map(|s| s.expose().to_owned());
+    let vllm_ocr_max_tokens = vllm_provider.and_then(|p| p.max_tokens);
+    let vllm_ocr_temperature = vllm_provider.and_then(|p| p.temperature);
+
+    // Unlimited-OCR URL: request → saved config → default.
+    let unlimited_ocr_url = req
+        .unlimited_ocr_url
+        .or_else(|| pipeline_config.unlimited_ocr_url.clone());
 
     let spec = PipelineSpec {
         scope: match req.pages {
@@ -108,11 +129,16 @@ async fn start_pipeline(
             text_node_ids: req.text_node_ids,
             region: req.region,
             reading_order: req.reading_order,
-            unlimited_ocr_mode: req.unlimited_ocr_mode,
-            unlimited_ocr_url: req.unlimited_ocr_url,
+            unlimited_ocr_mode,
+            unlimited_ocr_url,
             detector_confidence_threshold,
             segmenter_binary_threshold,
             comic_text_bubble_detector_classes,
+            vllm_ocr_base_url,
+            vllm_ocr_model,
+            vllm_ocr_api_key,
+            vllm_ocr_max_tokens,
+            vllm_ocr_temperature,
         },
     };
 

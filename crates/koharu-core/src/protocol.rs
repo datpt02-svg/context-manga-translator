@@ -285,7 +285,18 @@ pub enum UnlimitedOcrMode {
 #[serde(rename_all = "camelCase")]
 pub struct ProviderPatch {
     pub id: String,
-    pub base_url: Option<String>,
+    /// `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub base_url: Option<Option<String>>,
     /// `"[REDACTED]"` → keep existing keyring secret; empty → clear; otherwise save.
     pub api_key: Option<String>,
+    /// `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub model: Option<Option<String>>,
+    /// `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub max_tokens: Option<Option<u32>>,
+    /// `None` = unchanged. `Some(None)` = clear. `Some(Some(x))` = set.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub temperature: Option<Option<f64>>,
 }

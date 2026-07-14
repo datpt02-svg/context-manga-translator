@@ -151,6 +151,12 @@ pub struct ProviderConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<String>)]
     pub api_key: Option<RedactedSecret>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
 }
 
 impl Default for DataConfig {
@@ -293,12 +299,40 @@ pub fn apply_patch(config: &mut AppConfig, patch: koharu_core::ConfigPatch) {
                 Some(s) => Some(RedactedSecret::new(s)),
                 None => existing.and_then(|e| e.api_key.clone()),
             };
+            let base_url = match p.base_url {
+                Some(Some(v)) => {
+                    let t = v.trim().to_string();
+                    if t.is_empty() { None } else { Some(t) }
+                }
+                Some(None) => None,
+                None => existing.and_then(|e| e.base_url.clone()),
+            };
+            let model = match p.model {
+                Some(Some(v)) => {
+                    let t = v.trim().to_string();
+                    if t.is_empty() { None } else { Some(t) }
+                }
+                Some(None) => None,
+                None => existing.and_then(|e| e.model.clone()),
+            };
+            let max_tokens = match p.max_tokens {
+                Some(Some(v)) if v > 0 => Some(v),
+                Some(Some(_)) => None,
+                Some(None) => None,
+                None => existing.and_then(|e| e.max_tokens),
+            };
+            let temperature = match p.temperature {
+                Some(Some(v)) => Some(v.clamp(0.0, 2.0)),
+                Some(None) => None,
+                None => existing.and_then(|e| e.temperature),
+            };
             new_providers.push(ProviderConfig {
                 id: p.id,
-                base_url: p
-                    .base_url
-                    .or_else(|| existing.and_then(|e| e.base_url.clone())),
+                base_url,
                 api_key,
+                model,
+                max_tokens,
+                temperature,
             });
         }
         config.providers = new_providers;

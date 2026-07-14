@@ -199,6 +199,11 @@ impl KoharuServer {
                 segmenter_binary_threshold: pipeline_config.segmenter_binary_threshold,
                 comic_text_bubble_detector_classes: pipeline_config
                     .comic_text_bubble_detector_classes,
+                vllm_ocr_base_url: None,
+                vllm_ocr_model: None,
+                vllm_ocr_api_key: None,
+                vllm_ocr_max_tokens: None,
+                vllm_ocr_temperature: None,
             },
         };
         let job_id = Uuid::new_v4().to_string();

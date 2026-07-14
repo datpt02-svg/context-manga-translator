@@ -8,7 +8,7 @@ use koharu_core::{NodeDataPatch, NodePatch, Op, TextDataPatch, TextTranslationCo
 use koharu_ml::comic_text_detector::crop_text_block_bbox;
 
 use crate::pipeline::artifacts::Artifact;
-use crate::pipeline::engine::{Engine, EngineCtx, EngineInfo};
+use crate::pipeline::engine::{Engine, EngineCtx, EngineInfo, PipelineRunOptions};
 use crate::pipeline::engines::support::{load_source_image, text_node_to_region, text_nodes};
 use base64::Engine as _;
 
@@ -17,14 +17,26 @@ use crate::pipeline::unlimited_ocr_client::{
 };
 
 pub struct Model {
-    client: UnlimitedOcrClient,
+    env_url: String,
 }
 
 impl Model {
-    pub fn new(base_url: impl Into<String>) -> Self {
+    pub fn new(env_url: impl Into<String>) -> Self {
         Self {
-            client: UnlimitedOcrClient::new(base_url),
+            env_url: env_url.into(),
         }
+    }
+
+    /// Pick the URL: saved config → env → default.
+    fn resolve_url(&self, opts: &PipelineRunOptions) -> String {
+        opts.unlimited_ocr_url
+            .clone()
+            .filter(|u| !u.is_empty())
+            .or_else(|| {
+                let e = self.env_url.clone();
+                if e.is_empty() { None } else { Some(e) }
+            })
+            .unwrap_or_else(|| "http://127.0.0.1:7862".to_string())
     }
 }
 
@@ -36,6 +48,8 @@ impl Engine for Model {
             return Ok(Vec::new());
         }
 
+        let url = self.resolve_url(ctx.options);
+        let client = UnlimitedOcrClient::new(url);
         let image = load_source_image(ctx.scene, ctx.page, ctx.blobs)
             .context("failed to load source image for Unlimited-OCR")?;
 
@@ -60,7 +74,7 @@ impl Engine for Model {
         }
 
         // Health check first
-        self.client
+        client
             .health()
             .await
             .context("Unlimited-OCR service not available — is the Python service running?")?;
@@ -72,8 +86,7 @@ impl Engine for Model {
             return_context: true,
         };
 
-        let response = self
-            .client
+        let response = client
             .ocr_crops(request)
             .await
             .context("Unlimited-OCR batch request failed")?;
@@ -178,8 +191,8 @@ inventory::submit! {
         needs: &[Artifact::TextBoxes],
         produces: &[Artifact::OcrText],
         load: |_runtime, _cpu| Box::pin(async move {
-            let url = std::env::var("UNLIMITED_OCR_URL")
-                .unwrap_or_else(|_| "http://127.0.0.1:7862".to_string());
+            // URL resolved at run-time from ctx.options.unlimited_ocr_url or env.
+            let url = std::env::var("UNLIMITED_OCR_URL").unwrap_or_default();
             Ok(Box::new(Model::new(url)) as Box<dyn Engine>)
         }),
     }

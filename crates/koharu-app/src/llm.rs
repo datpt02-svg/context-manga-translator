@@ -387,7 +387,24 @@ async fn provider_catalog(
                     };
                     match discover_models(descriptor.id, cfg) {
                         Ok(future) => match future.await {
-                            Ok(discovered) => (
+                            Ok(mut discovered) => {
+                                // Inject stored model (manually typed in Settings)
+                                // if missing from discovered list.
+                                if let Some(stored_model) = stored
+                                    .and_then(|p| p.model.as_deref())
+                                    .filter(|m| !m.trim().is_empty())
+                                {
+                                    if !discovered
+                                        .iter()
+                                        .any(|m| m.id == stored_model)
+                                    {
+                                        discovered.push(koharu_llm::providers::DiscoveredProviderModel {
+                                            id: stored_model.to_string(),
+                                            name: stored_model.to_string(),
+                                        });
+                                    }
+                                }
+                                (
                                 LlmProviderCatalogStatus::Ready,
                                 None,
                                 discovered
@@ -398,7 +415,7 @@ async fn provider_catalog(
                                         languages: descriptor.supported_languages.tags(),
                                     })
                                     .collect(),
-                            ),
+                            )},
                             Err(e) => (
                                 LlmProviderCatalogStatus::DiscoveryFailed,
                                 Some(format!("{e:#}")),
@@ -458,8 +475,8 @@ pub fn provider_config_from_settings(
             .and_then(|p| p.api_key.as_ref())
             .map(|s| s.expose().to_owned()),
         base_url: stored.and_then(|p| p.base_url.clone()),
-        temperature: None,
-        max_tokens: None,
+        temperature: stored.and_then(|p| p.temperature),
+        max_tokens: stored.and_then(|p| p.max_tokens),
     }
 }
 

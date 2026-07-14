@@ -29,7 +29,7 @@ export interface StartPipelineRequest {
      * @nullable
      */
   textNodeIds?: NodeId[] | null;
-  unlimitedOcrMode?: UnlimitedOcrMode;
+  unlimitedOcrMode?: null | UnlimitedOcrMode;
   /** @nullable */
   unlimitedOcrUrl?: string | null;
 }

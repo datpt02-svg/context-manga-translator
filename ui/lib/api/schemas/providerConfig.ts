@@ -13,4 +13,13 @@ export interface ProviderConfig {
   /** @nullable */
   base_url?: string | null;
   id: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max_tokens?: number | null;
+  /** @nullable */
+  model?: string | null;
+  /** @nullable */
+  temperature?: number | null;
 }
