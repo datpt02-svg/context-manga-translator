@@ -299,6 +299,7 @@ mod tests {
             kind: NodeKind::Text(TextData {
                 text: text.map(str::to_string),
                 ocr_uncertain: uncertain,
+                confidence: 0.95,
                 ..Default::default()
             }),
         }

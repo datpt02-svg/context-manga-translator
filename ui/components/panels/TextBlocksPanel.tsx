@@ -27,10 +27,10 @@ import { getConfig, startPipeline, useGetCurrentLlm } from '@/lib/api/default/de
 import { fetchApi } from '@/lib/api/fetch'
 import type { TextDataPatch } from '@/lib/api/schemas'
 import { applyOp, invalidateScene, queueAutoRender, reorderPageTextNodes } from '@/lib/io/scene'
+import { pipelineOptions } from '@/lib/pipeline'
 import { ops } from '@/lib/ops'
 import { useEditorUiStore } from '@/lib/stores/editorUiStore'
 import { useJobsStore } from '@/lib/stores/jobsStore'
-import { usePreferencesStore } from '@/lib/stores/preferencesStore'
 import { useSelectionStore } from '@/lib/stores/selectionStore'
 
 export function TextBlocksPanel() {
@@ -90,17 +90,11 @@ export function TextBlocksPanel() {
     const cfg = await getConfig()
     const translator = cfg.pipeline?.translator || 'llm'
     const renderer = cfg.pipeline?.renderer || 'koharu-renderer'
-    const editor = useEditorUiStore.getState()
-    const prefs = usePreferencesStore.getState()
-    // Keep rendering page-scoped, but constrain translation to the clicked block.
     await startPipeline({
       steps: [translator, renderer],
       pages: [page.id],
       textNodeIds: [nodeId],
-      targetLanguage: editor.selectedLanguage,
-      systemPrompt: prefs.customSystemPrompt,
-      defaultFont: prefs.defaultFont,
-      readingOrder: editor.readingOrder === 'custom' ? undefined : editor.readingOrder,
+      ...pipelineOptions(),
     })
   }
 

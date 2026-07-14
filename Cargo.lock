@@ -4222,6 +4222,7 @@ dependencies = [
  "clap",
  "dashmap",
  "fs4",
+ "futures",
  "image",
  "inventory",
  "koharu-ai",

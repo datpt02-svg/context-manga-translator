@@ -33,6 +33,7 @@ import {
   useGetCurrentLlm,
 } from '@/lib/api/default/default'
 import type { LlmCatalog, LlmCatalogModel, LlmProviderCatalog, LlmTarget } from '@/lib/api/schemas'
+import { pipelineOptions } from '@/lib/pipeline'
 import { useEditorUiStore } from '@/lib/stores/editorUiStore'
 import { useJobsStore } from '@/lib/stores/jobsStore'
 import { usePreferencesStore } from '@/lib/stores/preferencesStore'
@@ -121,15 +122,10 @@ function WorkflowButtons() {
     if (!cfg.pipeline) return
     const steps = pick(cfg.pipeline).filter((s): s is string => !!s)
     if (steps.length === 0) return
-    const editor = useEditorUiStore.getState()
-    const prefs = usePreferencesStore.getState()
     await startPipeline({
       steps,
       pages: [pageId],
-      targetLanguage: editor.selectedLanguage,
-      systemPrompt: prefs.customSystemPrompt,
-      defaultFont: prefs.defaultFont,
-      readingOrder: editor.readingOrder === 'custom' ? undefined : editor.readingOrder,
+      ...pipelineOptions(),
     })
   }
 

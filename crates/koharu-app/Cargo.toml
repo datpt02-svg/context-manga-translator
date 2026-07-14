@@ -35,6 +35,7 @@ camino = { workspace = true }
 chrono = { workspace = true }
 dashmap = { workspace = true }
 fs4 = { workspace = true }
+futures = { workspace = true }
 image = { workspace = true }
 inventory = { workspace = true }
 lru = { workspace = true }

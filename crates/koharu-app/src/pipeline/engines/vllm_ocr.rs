@@ -12,8 +12,9 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use base64::Engine as _;
+use futures::StreamExt;
 use image::DynamicImage;
-use koharu_core::{NodeDataPatch, NodePatch, Op, TextDataPatch, TextDirection};
+use koharu_core::{NodeDataPatch, NodeId, NodePatch, Op, TextDataPatch, TextDirection};
 use koharu_ml::comic_text_detector::crop_text_block_bbox;
 
 use crate::pipeline::artifacts::Artifact;
@@ -108,29 +109,81 @@ impl Engine for Model {
         let settings = VllmOcrSettings::resolve(ctx.options)?;
         let endpoint = format!("{}/chat/completions", settings.base_url);
         let image = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
+
+        // Phase 1 — synchronous prep: crop + base64 encode every text box.
+        struct CropJob {
+            node_id: NodeId,
+            b64: String,
+            confidence: f32,
+            is_vertical: bool,
+            bbox_width: f32,
+            bbox_height: f32,
+        }
+        let jobs: Vec<CropJob> = texts
+            .iter()
+            .map(|(node_id, tf, td)| {
+                let region = text_node_to_region(tf, td);
+                let crop = crop_text_block_bbox(&image, &region);
+                let b64 = encode_png(&crop);
+                CropJob {
+                    node_id: *node_id,
+                    b64,
+                    confidence: td.confidence,
+                    is_vertical: matches!(
+                        td.source_direction,
+                        Some(TextDirection::Vertical)
+                    ),
+                    bbox_width: tf.width,
+                    bbox_height: tf.height,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Phase 2 — concurrent OCR requests (vLLM batches internally).
+        let concurrency = 2usize;
+        let results: Vec<(usize, NodeId, f32, bool, f32, f32, Result<String>)> =
+            futures::stream::iter(jobs.into_iter().enumerate().map(
+                |(i, job)| {
+                    let endpoint = endpoint.clone();
+                    let model = settings.model.clone();
+                    let api_key = settings.api_key.clone();
+                    async move {
+                        let text = ocr_one_crop(
+                            &self.client,
+                            &endpoint,
+                            &model,
+                            api_key.as_deref(),
+                            settings.max_tokens,
+                            settings.temperature,
+                            &job.b64,
+                        )
+                        .await;
+                        (
+                            i,
+                            job.node_id,
+                            job.confidence,
+                            job.is_vertical,
+                            job.bbox_width,
+                            job.bbox_height,
+                            text,
+                        )
+                    }
+                },
+            ))
+            .buffer_unordered(concurrency)
+            .collect()
+            .await;
+
+        // Phase 3 — build ops (results arrive in arbitrary order, each
+        // Op targets a specific node_id so ordering is irrelevant).
         let mut ops = Vec::with_capacity(texts.len());
-
-        for (node_id, tf, td) in &texts {
-            let region = text_node_to_region(tf, td);
-            let crop = crop_text_block_bbox(&image, &region);
-            let b64 = encode_png(&crop);
-
-            let recognized = match ocr_one_crop(
-                &self.client,
-                &endpoint,
-                &settings.model,
-                settings.api_key.as_deref(),
-                settings.max_tokens,
-                settings.temperature,
-                &b64,
-            )
-            .await
-            {
+        for (_i, node_id, td_confidence, is_vertical, bbox_width, bbox_height, result) in results {
+            let recognized = match result {
                 Ok(text) => text,
                 Err(e) => {
                     ops.push(Op::UpdateNode {
                         page: ctx.page,
-                        id: *node_id,
+                        id: node_id,
                         patch: NodePatch {
                             data: Some(NodeDataPatch::Text(TextDataPatch {
                                 ocr_engine: Some(Some("vllm-ocr".to_string())),
@@ -150,7 +203,7 @@ impl Engine for Model {
             if recognized.trim().is_empty() {
                 ops.push(Op::UpdateNode {
                     page: ctx.page,
-                    id: *node_id,
+                    id: node_id,
                     patch: NodePatch {
                         data: Some(NodeDataPatch::Text(TextDataPatch {
                             ocr_engine: Some(Some("vllm-ocr".to_string())),
@@ -167,16 +220,16 @@ impl Engine for Model {
 
             let report = assess_ocr_quality(OcrQualityInput {
                 text: Some(&recognized),
-                detector_confidence: td.confidence,
+                detector_confidence: td_confidence,
                 ocr_confidence: None,
-                bbox_width: tf.width,
-                bbox_height: tf.height,
-                is_vertical: matches!(td.source_direction, Some(TextDirection::Vertical)),
+                bbox_width,
+                bbox_height,
+                is_vertical,
             });
 
             ops.push(Op::UpdateNode {
                 page: ctx.page,
-                id: *node_id,
+                id: node_id,
                 patch: NodePatch {
                     data: Some(NodeDataPatch::Text(TextDataPatch {
                         text: Some(Some(recognized)),

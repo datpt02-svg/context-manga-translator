@@ -25,8 +25,8 @@ import { getConfig, startPipeline } from '@/lib/api/default/default'
 import { isTauri, openExternalUrl } from '@/lib/backend'
 import { exportCurrentProjectAs, importPages } from '@/lib/io/pagesIo'
 import { closeProject, redoOp, selectAllTextNodesOnCurrentPage, undoOp } from '@/lib/io/scene'
+import { pipelineOptions } from '@/lib/pipeline'
 import { formatShortcutForDisplay, getPlatform } from '@/lib/shortcutUtils'
-import { useEditorUiStore } from '@/lib/stores/editorUiStore'
 import { usePreferencesStore } from '@/lib/stores/preferencesStore'
 import { useSelectionStore } from '@/lib/stores/selectionStore'
 
@@ -97,15 +97,10 @@ export function MenuBar() {
       p.inpainter,
       p.renderer,
     ].filter((s): s is string => !!s)
-    const editor = useEditorUiStore.getState()
-    const prefs = usePreferencesStore.getState()
     await startPipeline({
       steps,
       pages: opts.pageId ? [opts.pageId] : undefined,
-      targetLanguage: editor.selectedLanguage,
-      systemPrompt: prefs.customSystemPrompt,
-      defaultFont: prefs.defaultFont,
-      readingOrder: editor.readingOrder === 'custom' ? undefined : editor.readingOrder,
+      ...pipelineOptions(),
     })
   }
 
@@ -129,14 +124,10 @@ export function MenuBar() {
       prefs.customPipeline.inpainter ? p.inpainter : null,
       prefs.customPipeline.renderer ? p.renderer : null,
     ].filter((s): s is string => !!s)
-    const editor = useEditorUiStore.getState()
     await startPipeline({
       steps,
       pages: opts.pageId ? [opts.pageId] : undefined,
-      targetLanguage: editor.selectedLanguage,
-      systemPrompt: prefs.customSystemPrompt,
-      defaultFont: prefs.defaultFont,
-      readingOrder: editor.readingOrder === 'custom' ? undefined : editor.readingOrder,
+      ...pipelineOptions(),
     })
   }
 

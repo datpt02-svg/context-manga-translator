@@ -79,6 +79,8 @@ export async function exportCurrentProjectAs(
     const defaultName = filename ?? `${base}.${exportExtension[format]}`
     await saveBlob(blob, defaultName)
   } catch (err) {
+    // User cancelled the save dialog — not an error.
+    if (err instanceof DOMException && err.name === 'AbortError') return
     console.error('Export failed:', err)
     throw err
   }

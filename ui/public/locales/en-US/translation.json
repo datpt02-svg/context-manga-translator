@@ -417,6 +417,7 @@
     "httpReadTimeoutDescription": "Maximum time to wait for HTTP response reads before failing.",
     "httpMaxRetries": "HTTP Max Retries",
     "httpMaxRetriesDescription": "Number of automatic retries for transient HTTP failures.",
+    "restartBadge": "Requires restart",
     "restartApply": "Apply & Restart",
     "restartApplying": "Applying...",
     "restartRequiredDescription": "These settings are loaded at startup. Applying them will save the config and restart the app.",

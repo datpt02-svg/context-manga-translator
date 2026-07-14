@@ -9,7 +9,6 @@ import {
   AlertCircleIcon,
   LoaderIcon,
   PaletteIcon,
-  KeyIcon,
   HardDriveIcon,
   InfoIcon,
   CpuIcon,
@@ -69,7 +68,6 @@ import type {
   ConfigPatch,
   CodexDeviceLogin,
   EngineCatalog as GetEngineCatalog200,
-  LlmProviderCatalog,
   ProviderConfig,
 } from '@/lib/api/schemas'
 import { isTauri, openExternalUrl } from '@/lib/backend'
@@ -120,8 +118,6 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
         cfg.pipeline.comic_text_bubble_detector_classes ?? [
           ...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES,
         ],
-      vllmOcrTarget: cfg.pipeline.vllm_ocr_target ?? null,
-      vllmOcrMaxTokens: cfg.pipeline.vllm_ocr_max_tokens ?? null,
     }
   }
   if (cfg.providers) {
@@ -174,7 +170,6 @@ export function SettingsDialog({
   }, [defaultTab, open])
 
   const [appConfig, setAppConfig] = useState<UpdateConfigBody | null>(null)
-  const [providerCatalogs, setProviderCatalogs] = useState<LlmProviderCatalog[]>([])
   const [apiKeyDrafts, setApiKeyDrafts] = useState<Record<string, string>>({})
   const [dataPathDraft, setDataPathDraft] = useState('')
   const [httpConnectTimeoutDraft, setHttpConnectTimeoutDraft] = useState('')
@@ -190,13 +185,11 @@ export function SettingsDialog({
     if (!open) return
     void (async () => {
       try {
-        const [config, catalog, engines] = await Promise.all([
+        const [config, engines] = await Promise.all([
           getConfig(),
-          getLlmCatalog(),
           getEngineCatalog(),
         ])
         setAppConfig(config)
-        setProviderCatalogs(catalog.providers)
         setEngineCatalog(engines)
       } catch {}
     })()
@@ -239,9 +232,7 @@ export function SettingsDialog({
   const persistConfig = async (next: UpdateConfigBody) => {
     try {
       const saved = await updateConfig(next)
-      const catalog = await getLlmCatalog()
       setAppConfig(saved)
-      setProviderCatalogs(catalog.providers)
       queryClient.invalidateQueries({ queryKey: getGetLlmCatalogQueryKey() })
       return saved
     } catch {
@@ -370,25 +361,16 @@ export function SettingsDialog({
                   }
                   onBaseUrlBlur={() => appConfig && void persistConfig(appConfig)}
                   onModelChange={(id, v) => {
-                    upsertProvider(id, (p) => ({
-                      ...p,
-                      model: v || null,
-                    }))
-                    appConfig && void persistConfig(appConfig)
+                    void upsertProvider(id, (p) => ({ ...p, model: v || null }))
+                    void persistConfig(appConfig)
                   }}
                   onMaxTokensChange={(id, v) => {
-                    upsertProvider(id, (p) => ({
-                      ...p,
-                      max_tokens: v || null,
-                    }))
-                    appConfig && void persistConfig(appConfig)
+                    void upsertProvider(id, (p) => ({ ...p, max_tokens: v || null }))
+                    void persistConfig(appConfig)
                   }}
                   onTemperatureChange={(id, v) => {
-                    upsertProvider(id, (p) => ({
-                      ...p,
-                      temperature: v || null,
-                    }))
-                    appConfig && void persistConfig(appConfig)
+                    void upsertProvider(id, (p) => ({ ...p, temperature: v || null }))
+                    void persistConfig(appConfig)
                   }}
                   onApiKeyChange={(id, v) => setApiKeyDrafts((c) => ({ ...c, [id]: v }))}
                   onSaveKey={(id) => {
@@ -539,7 +521,7 @@ const COMIC_TEXT_BUBBLE_DETECTOR_CLASSES = [
   ...DEFAULT_COMIC_TEXT_BUBBLE_DETECTOR_CLASSES,
 ] as const
 
-function EnginesPane({
+export function EnginesPane({
   catalog,
   pipeline,
   onChange,
@@ -639,7 +621,7 @@ function EnginesPane({
                   </Label>
                   <div className='flex items-center gap-2'>
                     <span className='text-xs tabular-nums text-muted-foreground'>
-                      {detectorThreshold?.toFixed(2)}
+                      {thresholdDraft?.toFixed(2)}
                     </span>
                     {pipeline.detector_confidence_threshold != null && (
                       <button
@@ -680,7 +662,7 @@ function EnginesPane({
                   </Label>
                   <div className='flex items-center gap-2'>
                     <span className='text-xs tabular-nums text-muted-foreground'>
-                      {segmenterThreshold?.toFixed(2)}
+                      {segmenterThresholdDraft?.toFixed(2)}
                     </span>
                     {pipeline.segmenter_binary_threshold != null && (
                       <button
@@ -1492,13 +1474,18 @@ function StoragePane({
   onApply: () => void
 }) {
   const { t } = useTranslation()
+  const Badge = ({ children }: { children: ReactNode }) => (
+    <span className='ml-1.5 rounded-sm bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'>
+      {children}
+    </span>
+  )
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   return (
     <>
       <Section title={t('settings.runtime')} description={t('settings.runtimeDescription')}>
         <div className='space-y-1.5'>
-          <Label className='text-xs'>{t('settings.dataPath')}</Label>
+          <Label className='text-xs'>{t('settings.dataPath')}<Badge>{t('settings.restartBadge')}</Badge></Label>
           <Input type='text' value={dataPath} onChange={(e) => onPathChange(e.target.value)} />
           <p className='text-xs leading-relaxed text-muted-foreground'>
             {t('settings.dataPathDescription')}
@@ -1507,7 +1494,7 @@ function StoragePane({
 
         <div className='grid gap-4 md:grid-cols-2'>
           <div className='space-y-1.5'>
-            <Label className='text-xs'>{t('settings.httpConnectTimeout')}</Label>
+            <Label className='text-xs'>{t('settings.httpConnectTimeout')}<Badge>{t('settings.restartBadge')}</Badge></Label>
             <Input
               type='number'
               min='1'
@@ -1522,7 +1509,7 @@ function StoragePane({
           </div>
 
           <div className='space-y-1.5'>
-            <Label className='text-xs'>{t('settings.httpReadTimeout')}</Label>
+            <Label className='text-xs'>{t('settings.httpReadTimeout')}<Badge>{t('settings.restartBadge')}</Badge></Label>
             <Input
               type='number'
               min='1'
@@ -1538,7 +1525,7 @@ function StoragePane({
         </div>
 
         <div className='space-y-1.5'>
-          <Label className='text-xs'>{t('settings.httpMaxRetries')}</Label>
+          <Label className='text-xs'>{t('settings.httpMaxRetries')}<Badge>{t('settings.restartBadge')}</Badge></Label>
           <Input
             type='number'
             min='0'

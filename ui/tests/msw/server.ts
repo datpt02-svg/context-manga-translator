@@ -1,7 +1,5 @@
 import { setupServer } from 'msw/node'
 
-import { getDefaultMock } from '@/lib/api/default/default.msw'
-
-// Orval-generated handlers seed every endpoint with faker data. Individual
-// tests override specific routes via `server.use(http.get(...))`.
-export const server = setupServer(...getDefaultMock())
+// Tests register their own handlers via `server.use(http.get(...))`.
+// No auto-generated mocks — every test explicitly defines the routes it needs.
+export const server = setupServer()
