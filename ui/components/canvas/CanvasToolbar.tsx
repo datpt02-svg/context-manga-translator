@@ -77,6 +77,7 @@ function WorkflowButtons() {
 
     // if vllm-ocr provider configured with a model, replace translation step with vllm-ocr
     const vllmProvider = cfg.providers?.find((p) => p.id === 'vllm-ocr' && p.model)
+    console.log('providers:', JSON.stringify(cfg.providers), 'vllmProvider:', vllmProvider)
     if (vllmProvider) {
       for (let i = 0; i < steps.length; i++) {
         if (steps[i].endsWith('llm') || steps[i] === 'llm') steps[i] = 'vllm-ocr'
