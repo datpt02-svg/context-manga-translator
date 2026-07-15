@@ -85,6 +85,10 @@ pub struct PipelineRunOptions {
     pub vllm_ocr_max_tokens: Option<u32>,
     /// Temperature for vLLM OCR requests.
     pub vllm_ocr_temperature: Option<f64>,
+    /// Custom system prompt for vLLM OCR. `None` → hardcoded default (OCR engine).
+    pub vllm_ocr_system_prompt: Option<String>,
+    /// Target language hint for vLLM OCR. `None` → unguided.
+    pub vllm_ocr_target_language: Option<String>,
 }
 
 impl Default for PipelineRunOptions {
@@ -109,6 +113,8 @@ impl Default for PipelineRunOptions {
             vllm_ocr_api_key: None,
             vllm_ocr_max_tokens: None,
             vllm_ocr_temperature: None,
+            vllm_ocr_system_prompt: None,
+            vllm_ocr_target_language: None,
         }
     }
 }

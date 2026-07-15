@@ -32,4 +32,8 @@ export interface StartPipelineRequest {
   unlimitedOcrMode?: null | UnlimitedOcrMode;
   /** @nullable */
   unlimitedOcrUrl?: string | null;
+  /** @nullable */
+  vllmOcrSystemPrompt?: string | null;
+  /** @nullable */
+  vllmOcrTargetLanguage?: string | null;
 }

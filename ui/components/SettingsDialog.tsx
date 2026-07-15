@@ -38,6 +38,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Kbd } from '@/components/ui/kbd'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -124,7 +125,10 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
     patch.providers = cfg.providers.map((p) => ({
       id: p.id,
       baseUrl: p.base_url ?? null,
+      model: p.model ?? null,
       apiKey: p.api_key ?? null,
+      maxTokens: p.max_tokens ?? null,
+      temperature: p.temperature ?? null,
     }))
   }
   return patch
@@ -241,13 +245,15 @@ export function SettingsDialog({
   }
 
   const upsertProvider = (id: string, updater: (p: ProviderConfig) => ProviderConfig) => {
-    if (!appConfig) return
+    if (!appConfig) return appConfig
     const providers = [...(appConfig.providers ?? [])]
     const idx = providers.findIndex((p) => p.id === id)
     const current = idx >= 0 ? providers[idx] : { id }
     if (idx >= 0) providers[idx] = updater(current)
     else providers.push(updater(current))
-    setAppConfig({ ...appConfig, providers })
+    const next = { ...appConfig, providers }
+    setAppConfig(next)
+    return next
   }
 
   const handleApplyStorageSettings = async () => {
@@ -353,24 +359,25 @@ export function SettingsDialog({
                 <ModelsPane
                   config={appConfig}
                   drafts={apiKeyDrafts}
-                  onBaseUrlChange={(id, v) =>
-                    upsertProvider(id, (p) => ({
+                  onBaseUrlChange={(id, v) => {
+                    const next = upsertProvider(id, (p) => ({
                       ...p,
                       base_url: v || null,
                     }))
-                  }
-                  onBaseUrlBlur={() => appConfig && void persistConfig(appConfig)}
+                    if (next) void persistConfig(next)
+                  }}
+                  onBaseUrlBlur={() => {}}
                   onModelChange={(id, v) => {
-                    void upsertProvider(id, (p) => ({ ...p, model: v || null }))
-                    void persistConfig(appConfig)
+                    const next = upsertProvider(id, (p) => ({ ...p, model: v || null }))
+                    if (next) void persistConfig(next)
                   }}
                   onMaxTokensChange={(id, v) => {
-                    void upsertProvider(id, (p) => ({ ...p, max_tokens: v || null }))
-                    void persistConfig(appConfig)
+                    const next = upsertProvider(id, (p) => ({ ...p, max_tokens: v ? Number(v) : null }))
+                    if (next) void persistConfig(next)
                   }}
                   onTemperatureChange={(id, v) => {
-                    void upsertProvider(id, (p) => ({ ...p, temperature: v || null }))
-                    void persistConfig(appConfig)
+                    const next = upsertProvider(id, (p) => ({ ...p, temperature: v ? Number(v) : null }))
+                    if (next) void persistConfig(next)
                   }}
                   onApiKeyChange={(id, v) => setApiKeyDrafts((c) => ({ ...c, [id]: v }))}
                   onSaveKey={(id) => {
@@ -818,47 +825,122 @@ function ModelsPane({
   onClearKey: (id: string) => void
 }) {
   const { t } = useTranslation()
+  const customSystemPrompt = usePreferencesStore((s) => s.customSystemPrompt)
+  const setCustomSystemPrompt = usePreferencesStore((s) => s.setCustomSystemPrompt)
+  const targetLanguage = usePreferencesStore((s) => s.targetLanguage)
+  const setTargetLanguage = usePreferencesStore((s) => s.setTargetLanguage)
+  const vllmSystemPrompt = usePreferencesStore((s) => s.vllmSystemPrompt)
+  const setVllmSystemPrompt = usePreferencesStore((s) => s.setVllmSystemPrompt)
+  const vllmTargetLanguage = usePreferencesStore((s) => s.vllmTargetLanguage)
+  const setVllmTargetLanguage = usePreferencesStore((s) => s.setVllmTargetLanguage)
 
   return (
     <div className='space-y-8'>
-      {/* ── LLM section ── */}
-      <ProviderSettingsCard
-        id='openai-compatible'
-        title={t('settings.llmSettings')}
-        description={t('settings.modelsDescription')}
-        config={config}
-        baseUrlPlaceholder='http://127.0.0.1:8000/v1'
-        showTemperature
-        modelPlaceholder='e.g. qwen2.5-14b-instruct'
-        drafts={drafts}
-        onBaseUrlChange={onBaseUrlChange}
-        onBaseUrlBlur={onBaseUrlBlur}
-        onModelChange={onModelChange}
-        onMaxTokensChange={onMaxTokensChange}
-        onTemperatureChange={onTemperatureChange}
-        onApiKeyChange={onApiKeyChange}
-        onSaveKey={onSaveKey}
-        onClearKey={onClearKey}
-      />
+      {/* ── LLM (Translate) ── */}
+      <div className='space-y-4 rounded-lg border p-4'>
+        <div className='space-y-1'>
+          <h3 className='text-sm font-medium'>{t('settings.llmSettings')}</h3>
+          <p className='text-xs text-muted-foreground'>{t('settings.modelsDescription')}</p>
+        </div>
+        <ProviderSettingsCard
+          id='openai-compatible'
+          config={config}
+          baseUrlPlaceholder='http://127.0.0.1:8000/v1'
+          showTemperature
+          modelPlaceholder='e.g. qwen2.5-14b-instruct'
+          drafts={drafts}
+          onBaseUrlChange={onBaseUrlChange}
+          onBaseUrlBlur={onBaseUrlBlur}
+          onModelChange={onModelChange}
+          onMaxTokensChange={onMaxTokensChange}
+          onTemperatureChange={onTemperatureChange}
+          onApiKeyChange={onApiKeyChange}
+          onSaveKey={onSaveKey}
+          onClearKey={onClearKey}
+        />
+        <div className='space-y-3'>
+          <div className='space-y-1.5'>
+            <Label>{t('settings.targetLanguage')}</Label>
+            <Select value={targetLanguage ?? 'vi-VN'} onValueChange={setTargetLanguage}>
+              <SelectTrigger data-testid='settings-language-select' className='w-full'>
+                <SelectValue placeholder={t('settings.targetLanguagePlaceholder')} />
+              </SelectTrigger>
+              <SelectContent position='popper'>
+                {Object.entries(t('llm.languages', { returnObjects: true }) as Record<string, string>).map(([code, label]) => (
+                  <SelectItem key={code} value={code}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='space-y-1.5'>
+            <Label>{t('settings.systemPrompt')}</Label>
+            <p className='text-xs text-muted-foreground'>{t('settings.systemPromptDescription')}</p>
+            <Textarea
+              data-testid='settings-system-prompt'
+              value={customSystemPrompt ?? ''}
+              onChange={(e) => setCustomSystemPrompt(e.target.value || undefined)}
+              placeholder={t('settings.systemPromptPlaceholder')}
+              rows={5}
+              className='min-h-0 resize-y'
+            />
+          </div>
+        </div>
+      </div>
 
-      {/* ── vLLM OCR section ── */}
-      <ProviderSettingsCard
-        id='vllm-ocr'
-        title={t('settings.vllmSettings')}
-        config={config}
-        baseUrlPlaceholder='http://127.0.0.1:8000/v1'
-        modelPlaceholder='e.g. qwen2.5-vl-7b-instruct'
-        showTemperature
-        drafts={drafts}
-        onBaseUrlChange={onBaseUrlChange}
-        onBaseUrlBlur={onBaseUrlBlur}
-        onModelChange={onModelChange}
-        onMaxTokensChange={onMaxTokensChange}
-        onTemperatureChange={onTemperatureChange}
-        onApiKeyChange={onApiKeyChange}
-        onSaveKey={onSaveKey}
-        onClearKey={onClearKey}
-      />
+      {/* ── vLLM (OCR) ── */}
+      <div className='space-y-4 rounded-lg border p-4'>
+        <div className='space-y-1'>
+          <h3 className='text-sm font-medium'>{t('settings.vllmSettings')}</h3>
+          <p className='text-xs text-muted-foreground'>{t('settings.modelsDescription')}</p>
+        </div>
+        <ProviderSettingsCard
+          id='vllm-ocr'
+          config={config}
+          baseUrlPlaceholder='http://127.0.0.1:8000/v1'
+          modelPlaceholder='e.g. qwen2.5-vl-7b-instruct'
+          showTemperature
+          drafts={drafts}
+          onBaseUrlChange={onBaseUrlChange}
+          onBaseUrlBlur={onBaseUrlBlur}
+          onModelChange={onModelChange}
+          onMaxTokensChange={onMaxTokensChange}
+          onTemperatureChange={onTemperatureChange}
+          onApiKeyChange={onApiKeyChange}
+          onSaveKey={onSaveKey}
+          onClearKey={onClearKey}
+        />
+        <div className='space-y-3'>
+          <div className='space-y-1.5'>
+            <Label>{t('settings.vllmTargetLanguage')}</Label>
+            <Select value={vllmTargetLanguage ?? 'ja-JP'} onValueChange={setVllmTargetLanguage}>
+              <SelectTrigger data-testid='settings-vllm-language-select' className='w-full'>
+                <SelectValue placeholder={t('settings.targetLanguagePlaceholder')} />
+              </SelectTrigger>
+              <SelectContent position='popper'>
+                {Object.entries(t('llm.languages', { returnObjects: true }) as Record<string, string>).map(([code, label]) => (
+                  <SelectItem key={code} value={code}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className='space-y-1.5'>
+            <Label>{t('settings.vllmSystemPrompt')}</Label>
+            <p className='text-xs text-muted-foreground'>{t('settings.vllmSystemPromptDescription')}</p>
+            <Textarea
+              data-testid='settings-vllm-system-prompt'
+              value={vllmSystemPrompt ?? ''}
+              onChange={(e) => setVllmSystemPrompt(e.target.value || undefined)}
+              placeholder={t('settings.vllmSystemPromptPlaceholder')}
+              rows={5}
+              className='min-h-0 resize-y'
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

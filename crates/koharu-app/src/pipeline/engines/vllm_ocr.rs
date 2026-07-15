@@ -31,6 +31,7 @@ struct VllmOcrSettings {
     api_key: Option<String>,
     max_tokens: u32,
     temperature: f64,
+    system_prompt: String,
 }
 
 impl VllmOcrSettings {
@@ -72,7 +73,19 @@ impl VllmOcrSettings {
             .vllm_ocr_temperature
             .unwrap_or(0.0);
 
-        Ok(Self { model, base_url, api_key, max_tokens, temperature })
+        let system_prompt = opts
+            .vllm_ocr_system_prompt
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .map(|p| {
+                opts.vllm_ocr_target_language
+                    .as_ref()
+                    .map(|lang| p.replace("{{ target_language }}", lang))
+                    .unwrap_or(p)
+            })
+            .unwrap_or_else(|| "You are an OCR engine. Return only the text visible in the image. Do not add explanations, markdown, or notes.".to_string());
+
+        Ok(Self { model, base_url, api_key, max_tokens, temperature, system_prompt })
     }
 }
 
@@ -147,6 +160,7 @@ impl Engine for Model {
                     let endpoint = endpoint.clone();
                     let model = settings.model.clone();
                     let api_key = settings.api_key.clone();
+                    let system_prompt = settings.system_prompt.clone();
                     async move {
                         let text = ocr_one_crop(
                             &self.client,
@@ -155,6 +169,7 @@ impl Engine for Model {
                             api_key.as_deref(),
                             settings.max_tokens,
                             settings.temperature,
+                            &system_prompt,
                             &job.b64,
                         )
                         .await;
@@ -261,6 +276,7 @@ async fn ocr_one_crop(
     api_key: Option<&str>,
     max_tokens: u32,
     temperature: f64,
+    system_prompt: &str,
     image_b64: &str,
 ) -> Result<String> {
     let body = serde_json::json!({
@@ -268,7 +284,7 @@ async fn ocr_one_crop(
         "messages": [
             {
                 "role": "system",
-                "content": "You are an OCR engine. Return only the text visible in the image. Do not add explanations, markdown, or notes."
+                "content": system_prompt
             },
             {
                 "role": "user",

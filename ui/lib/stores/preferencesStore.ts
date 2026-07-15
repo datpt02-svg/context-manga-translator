@@ -17,6 +17,12 @@ type PreferencesState = {
   toggleFavoriteFont: (font: string) => void
   customSystemPrompt?: string
   setCustomSystemPrompt: (prompt?: string) => void
+  targetLanguage?: string
+  setTargetLanguage: (lang?: string) => void
+  vllmSystemPrompt?: string
+  setVllmSystemPrompt: (prompt?: string) => void
+  vllmTargetLanguage?: string
+  setVllmTargetLanguage: (lang?: string) => void
   codexImagePrompt?: string
   setCodexImagePrompt: (prompt?: string) => void
   codexImageModel?: string
@@ -93,6 +99,9 @@ export const usePreferencesStore = create<PreferencesState>()(
             : [...state.favoriteFonts, font],
         })),
       setCustomSystemPrompt: (prompt) => set({ customSystemPrompt: prompt }),
+  setTargetLanguage: (lang) => set({ targetLanguage: lang }),
+  setVllmSystemPrompt: (prompt) => set({ vllmSystemPrompt: prompt }),
+  setVllmTargetLanguage: (lang) => set({ vllmTargetLanguage: lang }),
       setCodexImagePrompt: (prompt) => set({ codexImagePrompt: prompt }),
       setCodexImageModel: (model) => set({ codexImageModel: model }),
       setShortcuts: (shortcuts) =>

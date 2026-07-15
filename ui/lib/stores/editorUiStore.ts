@@ -56,9 +56,7 @@ type EditorUiState = {
 
   // llm ui
   selectedTarget?: LlmTarget
-  selectedLanguage?: string
   setSelectedTarget: (target?: LlmTarget) => void
-  setSelectedLanguage: (lang?: string) => void
 
   // ui error
   error?: { id: number; message: string }
@@ -86,7 +84,6 @@ const initialState = {
   renderEffect: { italic: false, bold: false } as RenderEffect,
   renderStroke: undefined as RenderStroke | undefined,
   selectedTarget: undefined as LlmTarget | undefined,
-  selectedLanguage: undefined as string | undefined,
   error: undefined as { id: number; message: string } | undefined,
   showNavigator: true,
   readingOrder: 'rtl' as const,
@@ -129,7 +126,6 @@ export const useEditorUiStore = create<EditorUiState>((set) => ({
   setRenderStroke: (stroke) => set({ renderStroke: stroke }),
 
   setSelectedTarget: (selectedTarget) => set({ selectedTarget }),
-  setSelectedLanguage: (selectedLanguage) => set({ selectedLanguage }),
 
   showError: (message) => {
     clearDismissTimer()

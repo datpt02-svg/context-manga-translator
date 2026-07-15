@@ -15,8 +15,10 @@ export function pipelineOptions() {
   const editor = useEditorUiStore.getState()
   const prefs = usePreferencesStore.getState()
   return {
-    targetLanguage: editor.selectedLanguage,
+    targetLanguage: prefs.targetLanguage,
     systemPrompt: prefs.customSystemPrompt,
+    vllmOcrSystemPrompt: prefs.vllmSystemPrompt,
+    vllmOcrTargetLanguage: prefs.vllmTargetLanguage,
     defaultFont: prefs.defaultFont,
     readingOrder: editor.readingOrder === 'custom' ? undefined : editor.readingOrder,
   }

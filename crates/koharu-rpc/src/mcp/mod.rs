@@ -204,6 +204,8 @@ impl KoharuServer {
                 vllm_ocr_api_key: None,
                 vllm_ocr_max_tokens: None,
                 vllm_ocr_temperature: None,
+                vllm_ocr_system_prompt: None,
+                vllm_ocr_target_language: None,
             },
         };
         let job_id = Uuid::new_v4().to_string();

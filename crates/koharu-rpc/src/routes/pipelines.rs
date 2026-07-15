@@ -55,6 +55,12 @@ pub struct StartPipelineRequest {
     pub unlimited_ocr_mode: Option<UnlimitedOcrMode>,
     #[serde(default)]
     pub unlimited_ocr_url: Option<String>,
+    /// Custom system prompt for vLLM OCR engine.
+    #[serde(default)]
+    pub vllm_ocr_system_prompt: Option<String>,
+    /// Target language hint for vLLM OCR — replaces `{{ target_language }}` in the prompt.
+    #[serde(default)]
+    pub vllm_ocr_target_language: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -110,6 +116,8 @@ async fn start_pipeline(
         .map(|s| s.expose().to_owned());
     let vllm_ocr_max_tokens = vllm_provider.and_then(|p| p.max_tokens);
     let vllm_ocr_temperature = vllm_provider.and_then(|p| p.temperature);
+    let vllm_ocr_system_prompt = req.vllm_ocr_system_prompt.clone();
+    let vllm_ocr_target_language = req.vllm_ocr_target_language.clone();
 
     // Unlimited-OCR URL: request → saved config → default.
     let unlimited_ocr_url = req
@@ -139,6 +147,8 @@ async fn start_pipeline(
             vllm_ocr_api_key,
             vllm_ocr_max_tokens,
             vllm_ocr_temperature,
+            vllm_ocr_system_prompt,
+            vllm_ocr_target_language,
         },
     };
 

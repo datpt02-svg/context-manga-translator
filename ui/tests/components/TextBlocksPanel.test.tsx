@@ -48,8 +48,8 @@ describe('TextBlocksPanel', () => {
     useSelectionStore.getState().setPage('p1')
     useSelectionStore.getState().select('t2', false)
     useJobsStore.getState().clear()
-    useEditorUiStore.setState({ selectedLanguage: 'en' })
     usePreferencesStore.setState({
+      targetLanguage: 'en',
       customSystemPrompt: 'translate naturally',
       defaultFont: 'Arial',
     })

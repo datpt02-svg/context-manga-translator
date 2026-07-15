@@ -76,7 +76,8 @@ impl PromptRenderer {
         let text = text.into();
         let sys = match custom_prompt {
             Some(p) if !p.trim().is_empty() => {
-                format!("{p} {BLOCK_TAG_INSTRUCTIONS}")
+                let rendered = p.replace("{{ target_language }}", &target_language.to_string());
+                format!("{rendered} {BLOCK_TAG_INSTRUCTIONS}")
             }
             _ => system_prompt(target_language),
         };
