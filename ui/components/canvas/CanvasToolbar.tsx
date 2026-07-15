@@ -107,6 +107,7 @@ function WorkflowButtons() {
       }
     }
     try {
+      console.log('final steps:', steps)
       const res = await startPipeline({
         steps,
         pages: [pageId],
