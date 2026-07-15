@@ -77,6 +77,7 @@ impl VllmOcrSettings {
         let target_lang = opts
             .vllm_ocr_target_language
             .as_deref()
+            .or_else(|| opts.target_language.as_deref())
             .unwrap_or("the target language");
         let system_prompt = opts
             .vllm_ocr_system_prompt

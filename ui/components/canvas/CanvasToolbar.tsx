@@ -84,23 +84,18 @@ function WorkflowButtons() {
       }
     }
 
-    // auto-load LLM/OCR provider
-    const needsLlm = steps.some((s) => s === 'vllm-ocr')
+    // auto-load LLM if not ready and any step needs it
+    const needsLlm = steps.some((s) => s.endsWith('llm'))
     if (!llmReady && needsLlm) {
       try {
-        for (const step of steps) {
-          const providerId = step === 'vllm-ocr' ? 'vllm-ocr' : 'openai-compatible'
-          const prov = cfg.providers?.find((p) => p.id === providerId)
-          if (prov?.model) {
-            await putCurrentLlm({ target: { kind: 'provider', providerId, modelId: prov.model } })
-            break
+        const prov = cfg.providers?.find((p) => p.id === 'openai-compatible')
+        if (prov?.model) {
+          await putCurrentLlm({ target: { kind: 'provider', providerId: 'openai-compatible', modelId: prov.model } })
+          for (let i = 0; i < 30; i++) {
+            await new Promise((r) => setTimeout(r, 500))
+            const cur = await getCurrentLlm()
+            if (cur?.status === 'ready') break
           }
-        }
-        // wait for LLM to reach ready status (poll up to 15 s)
-        for (let i = 0; i < 30; i++) {
-          await new Promise((r) => setTimeout(r, 500))
-          const cur = await getCurrentLlm()
-          if (cur?.status === 'ready') break
         }
       } catch {
         // best-effort: pipeline will fail naturally if LLM not ready
