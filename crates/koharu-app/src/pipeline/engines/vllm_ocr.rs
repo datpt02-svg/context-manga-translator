@@ -23,7 +23,7 @@ use crate::pipeline::engine::{Engine, EngineCtx, EngineInfo, PipelineRunOptions}
 use crate::pipeline::engines::support::{load_source_image, text_node_to_region, text_nodes};
 use crate::pipeline::ocr_quality::{OcrQualityInput, assess_ocr_quality};
 
-const DEFAULT_MAX_TOKENS: u32 = 256;
+const DEFAULT_MAX_TOKENS: u32 = 20000;
 
 /// Resolved connection parameters for a vLLM OCR run.
 struct VllmOcrSettings {
