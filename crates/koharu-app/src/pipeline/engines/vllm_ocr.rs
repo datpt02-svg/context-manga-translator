@@ -284,13 +284,9 @@ async fn ocr_one_crop(
         "model": model,
         "messages": [
             {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
                 "role": "user",
                 "content": [
-                    { "type": "text", "text": "Read this manga panel text crop. Return only the recognized text." },
+                    { "type": "text", "text": system_prompt },
                     {
                         "type": "image_url",
                         "image_url": {
