@@ -57,3 +57,4 @@ site/
 # integration-tests shared runtime cache
 .cache/
 .claude
+.playwright-mcp

@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: '1gb',
     proxyTimeout: 300000,
   },
+  allowedDevOrigins: ['2aa8-2405-4802-1d94-4130-312a-a241-ce8c-39f9.ngrok-free.app'],
   async rewrites() {
     return [
       {

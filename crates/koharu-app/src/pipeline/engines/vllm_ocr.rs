@@ -318,9 +318,12 @@ async fn ocr_one_crop(
         .json()
         .await?;
 
-    let content = resp["choices"][0]["message"]["content"]
+    let raw = &resp["choices"][0]["message"];
+    let content = raw["content"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("vLLM OCR response has no choices[0].message.content"))?
+        .filter(|s| !s.is_empty())
+        .or_else(|| raw["reasoning_content"].as_str())
+        .ok_or_else(|| anyhow::anyhow!("vLLM OCR response has no content or reasoning_content"))?
         .to_string();
 
     Ok(content)
