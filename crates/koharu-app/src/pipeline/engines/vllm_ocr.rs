@@ -10,6 +10,7 @@
 //! `choices[0].message.content`.
 
 use anyhow::{Context, Result};
+use tracing;
 use async_trait::async_trait;
 use base64::Engine as _;
 use futures::StreamExt;
@@ -73,17 +74,22 @@ impl VllmOcrSettings {
             .vllm_ocr_temperature
             .unwrap_or(0.0);
 
+        let target_lang = opts
+            .vllm_ocr_target_language
+            .as_deref()
+            .unwrap_or("the target language");
         let system_prompt = opts
             .vllm_ocr_system_prompt
             .clone()
             .filter(|s| !s.trim().is_empty())
-            .map(|p| {
-                opts.vllm_ocr_target_language
-                    .as_ref()
-                    .map(|lang| p.replace("{{ target_language }}", lang))
-                    .unwrap_or(p)
-            })
-            .unwrap_or_else(|| "You are a professional manga translator. Translate every visible text into the target language. Return only the translated text, one line per text bubble.".to_string());
+            .map(|p| p.replace("{{ target_language }}", target_lang))
+            .unwrap_or_else(|| format!("You are a professional manga translator. Translate every visible text into {target_lang}. Return only the translated text, one line per text bubble."));
+
+        tracing::info!(
+            target: "vllm_ocr",
+            "resolve: model={model}, base_url={base_url}, target_lang={target_lang}, prompt_len={}",
+            system_prompt.len(),
+        );
 
         Ok(Self { model, base_url, api_key, max_tokens, temperature, system_prompt })
     }
