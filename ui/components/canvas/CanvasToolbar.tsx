@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { getConfig, putCurrentLlm, startPipeline, useGetCurrentLlm } from '@/lib/api/default/default'
+import { getConfig, getCurrentLlm, putCurrentLlm, startPipeline, useGetCurrentLlm } from '@/lib/api/default/default'
 import { pipelineOptions } from '@/lib/pipeline'
 import { useJobsStore } from '@/lib/stores/jobsStore'
 import { useSelectionStore } from '@/lib/stores/selectionStore'
@@ -73,17 +73,26 @@ function WorkflowButtons() {
     if (!cfg.pipeline) return
     const steps = pick(cfg.pipeline).filter((s): s is string => !!s)
     if (steps.length === 0) return
-    // auto-load LLM if not ready
-    if (!llmReady && steps.includes('llm')) {
+    // auto-load LLM/OCR provider based on the step we're about to run
+    const needsLlm = steps.some((s) => s.endsWith('llm') || s.startsWith('llm') || s === 'vllm-ocr')
+    if (!llmReady && needsLlm) {
       try {
-        const target = cfg.providers?.find((p) => p.id === 'openai-compatible')
-        if (target?.model) {
-          await putCurrentLlm({
-            target: { kind: 'provider', providerId: null, modelId: target.model },
-          })
+        for (const step of steps) {
+          const providerId = step === 'vllm-ocr' ? 'vllm-ocr' : 'openai-compatible'
+          const prov = cfg.providers?.find((p) => p.id === providerId)
+          if (prov?.model) {
+            await putCurrentLlm({ target: { kind: 'provider', providerId, modelId: prov.model } })
+            break // load one model per pipeline run
+          }
+        }
+        // wait for LLM to reach ready status (poll up to 15 s)
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 500))
+          const cur = await getCurrentLlm()
+          if (cur?.status === 'ready') break
         }
       } catch {
-        // best-effort: let the pipeline fail naturally if LLM not ready
+        // best-effort: pipeline will fail naturally if LLM not ready
       }
     }
     await startPipeline({
