@@ -83,7 +83,7 @@ impl VllmOcrSettings {
                     .map(|lang| p.replace("{{ target_language }}", lang))
                     .unwrap_or(p)
             })
-            .unwrap_or_else(|| "You are an OCR engine. Return only the text visible in the image. Do not add explanations, markdown, or notes.".to_string());
+            .unwrap_or_else(|| "You are a professional manga translator. Translate every visible text into the target language. Return only the translated text, one line per text bubble.".to_string());
 
         Ok(Self { model, base_url, api_key, max_tokens, temperature, system_prompt })
     }
