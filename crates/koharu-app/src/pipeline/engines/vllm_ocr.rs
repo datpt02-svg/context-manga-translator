@@ -84,7 +84,7 @@ impl VllmOcrSettings {
             .clone()
             .filter(|s| !s.trim().is_empty())
             .map(|p| p.replace("{{ target_language }}", target_lang))
-            .unwrap_or_else(|| format!("You are a professional manga translator. Translate every visible text into {target_lang}. Return only the translated text, one line per text bubble."));
+            .unwrap_or_else(|| format!("You are a professional manga translator. Read the Japanese text in this image and translate it into {target_lang}. Return a JSON object with two fields: \"ocr\" (the original Japanese text) and \"translation\" (the {target_lang} translation). Example: {{\"ocr\":\"元気ですか？\",\"translation\":\"Khỏe không?\"}}"));
 
         eprintln!(
             "[vllm_ocr] resolved: model={model}, base_url={base_url}, target_lang={target_lang}, prompt={}",
@@ -239,8 +239,16 @@ impl Engine for Model {
                 continue;
             }
 
+            let (ocr_text, translation) = match serde_json::from_str::<serde_json::Value>(&recognized) {
+                Ok(v) => (
+                    v["ocr"].as_str().unwrap_or(&recognized).to_string(),
+                    v["translation"].as_str().unwrap_or(&recognized).to_string(),
+                ),
+                _ => (recognized.clone(), recognized.clone()),
+            };
+
             let report = assess_ocr_quality(OcrQualityInput {
-                text: Some(&recognized),
+                text: Some(&ocr_text),
                 detector_confidence: td_confidence,
                 ocr_confidence: None,
                 bbox_width,
@@ -253,8 +261,8 @@ impl Engine for Model {
                 id: node_id,
                 patch: NodePatch {
                     data: Some(NodeDataPatch::Text(TextDataPatch {
-                        text: Some(Some(recognized.clone())),
-                        translation: Some(Some(recognized)),
+                        text: Some(Some(ocr_text)),
+                        translation: Some(Some(translation)),
                         ocr_engine: Some(Some("vllm-ocr".to_string())),
                         ocr_confidence: Some(None),
                         ocr_uncertain: Some(report.uncertain),
@@ -329,6 +337,12 @@ async fn ocr_one_crop(
         .ok_or_else(|| anyhow::anyhow!("vLLM OCR response has no content or reasoning_content"))?
         .to_string();
 
+    // Try to parse as JSON {"ocr": "...", "translation": "..."}. Fallback: use raw content as both.
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+        let ocr_text = parsed["ocr"].as_str().unwrap_or(&content).to_string();
+        let translation = parsed["translation"].as_str().unwrap_or(&ocr_text).to_string();
+        return Ok(serde_json::json!({"ocr": ocr_text, "translation": translation}).to_string());
+    }
     Ok(content)
 }
 

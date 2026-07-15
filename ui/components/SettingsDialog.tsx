@@ -1049,7 +1049,7 @@ function ProviderSettingsCard({
             min={1}
             value={cfg?.max_tokens ?? ''}
             onChange={(e) => onMaxTokensChange(id, e.target.value)}
-            placeholder='256'
+            placeholder='20000'
           />
         </div>
 

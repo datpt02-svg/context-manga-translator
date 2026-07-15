@@ -447,7 +447,7 @@
     "vllmSettings": "vLLM (OCR)",
     "vllmSystemPrompt": "OCR System Prompt",
     "vllmSystemPromptDescription": "Custom instructions for the OCR model. Use {{ target_language }} as a placeholder for the OCR target language.",
-    "vllmSystemPromptPlaceholder": "You are a professional manga translator. Translate every visible text into {{ target_language }}. Return only the translated text.",
+    "vllmSystemPromptPlaceholder": "You are a professional manga translator. Translate every visible text into {{ target_language }}. Return JSON: {\"ocr\":\"original text\",\"translation\":\"translated text\"}.",
     "vllmTargetLanguage": "OCR Target Language",
     "systemPrompt": "System Prompt",
     "systemPromptDescription": "Custom instructions sent to the LLM with each translation request. Use {{ target_language }} as a placeholder for the selected target language.",
