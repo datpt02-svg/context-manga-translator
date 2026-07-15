@@ -74,8 +74,17 @@ function WorkflowButtons() {
     const steps = pick(cfg.pipeline).filter((s): s is string => !!s)
     console.log('runStep steps:', steps)
     if (steps.length === 0) return
-    // auto-load LLM/OCR provider based on the step we're about to run
-    const needsLlm = steps.some((s) => s.endsWith('llm') || s.startsWith('llm') || s === 'vllm-ocr')
+
+    // if vllm-ocr provider configured with a model, replace translation step with vllm-ocr
+    const vllmProvider = cfg.providers?.find((p) => p.id === 'vllm-ocr' && p.model)
+    if (vllmProvider) {
+      for (let i = 0; i < steps.length; i++) {
+        if (steps[i].endsWith('llm') || steps[i] === 'llm') steps[i] = 'vllm-ocr'
+      }
+    }
+
+    // auto-load LLM/OCR provider
+    const needsLlm = steps.some((s) => s === 'vllm-ocr')
     if (!llmReady && needsLlm) {
       try {
         for (const step of steps) {
@@ -83,7 +92,7 @@ function WorkflowButtons() {
           const prov = cfg.providers?.find((p) => p.id === providerId)
           if (prov?.model) {
             await putCurrentLlm({ target: { kind: 'provider', providerId, modelId: prov.model } })
-            break // load one model per pipeline run
+            break
           }
         }
         // wait for LLM to reach ready status (poll up to 15 s)
