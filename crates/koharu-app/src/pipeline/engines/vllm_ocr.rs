@@ -85,10 +85,9 @@ impl VllmOcrSettings {
             .map(|p| p.replace("{{ target_language }}", target_lang))
             .unwrap_or_else(|| format!("You are a professional manga translator. Translate every visible text into {target_lang}. Return only the translated text, one line per text bubble."));
 
-        tracing::info!(
-            target: "vllm_ocr",
-            "resolve: model={model}, base_url={base_url}, target_lang={target_lang}, prompt_len={}",
-            system_prompt.len(),
+        eprintln!(
+            "[vllm_ocr] resolved: model={model}, base_url={base_url}, target_lang={target_lang}, prompt={}",
+            system_prompt,
         );
 
         Ok(Self { model, base_url, api_key, max_tokens, temperature, system_prompt })
