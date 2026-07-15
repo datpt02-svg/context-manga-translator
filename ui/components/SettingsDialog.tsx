@@ -861,7 +861,7 @@ function ModelsPane({
         <div className='space-y-3'>
           <div className='space-y-1.5'>
             <Label>{t('settings.targetLanguage')}</Label>
-            <Select value={targetLanguage ?? 'vi-VN'} onValueChange={setTargetLanguage}>
+            <Select value={targetLanguage ?? 'vi-VN'} onValueChange={(v) => { setTargetLanguage(v); if (!vllmTargetLanguage) setVllmTargetLanguage(v); }}>
               <SelectTrigger data-testid='settings-language-select' className='w-full'>
                 <SelectValue placeholder={t('settings.targetLanguagePlaceholder')} />
               </SelectTrigger>
