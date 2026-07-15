@@ -68,10 +68,11 @@ function WorkflowButtons() {
   const runStep = async (
     pick: (p: NonNullable<Awaited<ReturnType<typeof getConfig>>['pipeline']>) => string[],
   ) => {
-    if (!pageId) return
+    if (!pageId) { console.warn('no page'); return }
     const cfg = await getConfig()
-    if (!cfg.pipeline) return
+    if (!cfg.pipeline) { console.warn('no pipeline config'); return }
     const steps = pick(cfg.pipeline).filter((s): s is string => !!s)
+    console.log('runStep steps:', steps)
     if (steps.length === 0) return
     // auto-load LLM/OCR provider based on the step we're about to run
     const needsLlm = steps.some((s) => s.endsWith('llm') || s.startsWith('llm') || s === 'vllm-ocr')
@@ -95,11 +96,16 @@ function WorkflowButtons() {
         // best-effort: pipeline will fail naturally if LLM not ready
       }
     }
-    await startPipeline({
-      steps,
-      pages: [pageId],
-      ...pipelineOptions(),
-    })
+    try {
+      const res = await startPipeline({
+        steps,
+        pages: [pageId],
+        ...pipelineOptions(),
+      })
+      console.log('pipeline result:', res)
+    } catch (e) {
+      console.error('pipeline failed:', e)
+    }
   }
 
   type PipelinePick = (
