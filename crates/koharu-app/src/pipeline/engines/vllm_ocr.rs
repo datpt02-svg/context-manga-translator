@@ -247,7 +247,8 @@ impl Engine for Model {
                 id: node_id,
                 patch: NodePatch {
                     data: Some(NodeDataPatch::Text(TextDataPatch {
-                        text: Some(Some(recognized)),
+                        text: Some(Some(recognized.clone())),
+                        translation: Some(Some(recognized)),
                         ocr_engine: Some(Some("vllm-ocr".to_string())),
                         ocr_confidence: Some(None),
                         ocr_uncertain: Some(report.uncertain),
