@@ -348,7 +348,7 @@ inventory::submit! {
         id: "vllm-ocr",
         name: "vLLM OCR",
         needs: &[Artifact::TextBoxes],
-        produces: &[Artifact::OcrText],
+        produces: &[Artifact::OcrText, Artifact::Translations],
         load: |_runtime, _cpu| Box::pin(async move {
             Ok(Box::new(Model::new()) as Box<dyn Engine>)
         }),
