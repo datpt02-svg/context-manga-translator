@@ -223,14 +223,18 @@ pub async fn run(
                 renderer: &renderer,
                 progress: progress.as_ref().map(|s| {
                     let s = s.clone();
-                    let offset = completed as usize;
-                    let total = total_units as usize;
+                    let offset = completed as f64;
+                    let total = total_units as f64;
                     let pi = page_index;
                     Arc::new(move |tick: ProgressTick| {
-                        // Re-base overall_percent from engine's sub-step to
-                        // the full pipeline progress.
+                        // Re-base the engine's sub-step percent (0..100 of
+                        // its own work) into the full pipeline percent.
+                        // `offset` is the units already completed when this
+                        // step started; `total` is the global unit count.
+                        let local_pct = (tick.overall_percent.min(100)) as f64 / 100.0;
+                        let overall = ((offset + local_pct) / total * 100.0).min(100.0) as u8;
                         let mut t = tick.clone();
-                        t.overall_percent = (((offset + tick.step_index) * 100) / total).min(100) as u8;
+                        t.overall_percent = overall;
                         t.step_index = seq;
                         t.total_steps = total_steps;
                         t.page_index = pi;
