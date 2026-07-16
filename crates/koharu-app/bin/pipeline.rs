@@ -240,6 +240,8 @@ async fn run() -> Result<()> {
             vllm_ocr_api_key: None,
             vllm_ocr_max_tokens: None,
             vllm_ocr_temperature: None,
+            vllm_ocr_system_prompt: None,
+            vllm_ocr_target_language: None,
         },
     };
 

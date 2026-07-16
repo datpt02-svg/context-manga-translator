@@ -84,7 +84,7 @@ impl VllmOcrSettings {
             .clone()
             .filter(|s| !s.trim().is_empty())
             .map(|p| p.replace("{{ target_language }}", target_lang))
-            .unwrap_or_else(|| format!("You are a professional manga translator. Read the Japanese text in this image and translate it into {target_lang}. Return a JSON object with two fields: \"ocr\" (the original Japanese text) and \"translation\" (the {target_lang} translation). Example: {{\"ocr\":\"元気ですか？\",\"translation\":\"Khỏe không?\"}}"));
+            .unwrap_or_else(|| format!("You are a professional manga translator. Read the text in this image and translate it into {target_lang}. Return a JSON object with two fields: \"ocr\" (the original text) and \"translation\" (the {target_lang} translation). Example: {{\"ocr\":\"Hello\",\"translation\":\"Xin chào\"}}"));
 
         eprintln!(
             "[vllm_ocr] resolved: model={model}, base_url={base_url}, target_lang={target_lang}, prompt={}",
@@ -239,13 +239,8 @@ impl Engine for Model {
                 continue;
             }
 
-            let (ocr_text, translation) = match serde_json::from_str::<serde_json::Value>(&recognized) {
-                Ok(v) => (
-                    v["ocr"].as_str().unwrap_or(&recognized).to_string(),
-                    v["translation"].as_str().unwrap_or(&recognized).to_string(),
-                ),
-                _ => (recognized.clone(), recognized.clone()),
-            };
+            let (ocr_text, translation) = parse_ocr_json(&recognized)
+                .unwrap_or_else(|| (recognized.clone(), recognized.clone()));
 
             let report = assess_ocr_quality(OcrQualityInput {
                 text: Some(&ocr_text),
@@ -338,9 +333,7 @@ async fn ocr_one_crop(
         .to_string();
 
     // Try to parse as JSON {"ocr": "...", "translation": "..."}. Fallback: use raw content as both.
-    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-        let ocr_text = parsed["ocr"].as_str().unwrap_or(&content).to_string();
-        let translation = parsed["translation"].as_str().unwrap_or(&ocr_text).to_string();
+    if let Some((ocr_text, translation)) = parse_ocr_json(&content) {
         return Ok(serde_json::json!({"ocr": ocr_text, "translation": translation}).to_string());
     }
     Ok(content)
@@ -349,6 +342,49 @@ async fn ocr_one_crop(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+fn parse_ocr_json(response: &str) -> Option<(String, String)> {
+    let body = extract_fenced_json(response).unwrap_or(response.trim());
+    let parsed = parse_json_object(body)?;
+    let ocr_text = parsed["ocr"].as_str()?.to_string();
+    let translation = parsed["translation"]
+        .as_str()
+        .unwrap_or(&ocr_text)
+        .to_string();
+    Some((ocr_text, translation))
+}
+
+fn extract_fenced_json(text: &str) -> Option<&str> {
+    for fence in ["```json", "```"] {
+        let Some((_, after)) = text.split_once(fence) else {
+            continue;
+        };
+        let Some((candidate, _)) = after.split_once("```") else {
+            continue;
+        };
+        let candidate = candidate.trim();
+        if candidate.starts_with('{') {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn parse_json_object(text: &str) -> Option<serde_json::Value> {
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
+        return parsed.is_object().then_some(parsed);
+    }
+
+    text.char_indices()
+        .filter(|(_, ch)| *ch == '{')
+        .find_map(|(start, _)| {
+            serde_json::Deserializer::from_str(&text[start..])
+                .into_iter::<serde_json::Value>()
+                .next()?
+                .ok()
+                .filter(|v| v.is_object())
+        })
+}
 
 /// Encode a `DynamicImage` as a base64 PNG string.
 fn encode_png(image: &DynamicImage) -> String {
@@ -422,5 +458,18 @@ mod tests {
             }]
         });
         assert!(json["choices"][0]["message"]["content"].as_str().is_none());
+    }
+
+    #[test]
+    fn parse_fenced_json_object() {
+        let response = "```json\n{\n  \"ocr\": \"幽霊七球\\nフフ...\\nついに捕えたぞ\",\n  \"translation\": \"Thất Cầu Linh\\nHahaha...\\nCuối cùng cũng bắt được rồi!\"\n}\n```";
+
+        let (ocr, translation) = parse_ocr_json(response).expect("parse fenced JSON object");
+
+        assert_eq!(ocr, "幽霊七球\nフフ...\nついに捕えたぞ");
+        assert_eq!(
+            translation,
+            "Thất Cầu Linh\nHahaha...\nCuối cùng cũng bắt được rồi!"
+        );
     }
 }
