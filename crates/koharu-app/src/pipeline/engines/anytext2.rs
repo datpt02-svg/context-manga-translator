@@ -161,7 +161,7 @@ impl Engine for Model {
 
         // Auto-spawn if not running
         if client.health().await.is_err() {
-            let spawned = crate::services::ensure_running(&crate::services::ANYTEXT2)
+            let spawned = crate::services::ensure_running(crate::services::anytext2_spec())
                 .context("AnyText2 service not available")?;
             if spawned.is_some() {
                 // Give the HTTP server a moment to accept requests.
