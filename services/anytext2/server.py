@@ -17,14 +17,13 @@ import torch
 from fastapi import FastAPI, HTTPException
 from PIL import Image
 
-# ms_wrapper is not pip-installable. Set ANYTEXT2_REPO_DIR to the cloned
-# repo path, or place ms_wrapper.py alongside this file.
+# ms_wrapper.py depends on sibling modules (cldm, ldm, lora_util, ...)
+# from the anytext2 repo. Set ANYTEXT2_REPO_DIR to the cloned repo path.
 _anytext2_repo = os.environ.get("ANYTEXT2_REPO_DIR")
-_script_dir = os.path.dirname(os.path.abspath(__file__))
 if _anytext2_repo and os.path.isdir(_anytext2_repo):
     sys.path.insert(0, _anytext2_repo)
-elif os.path.isfile(os.path.join(_script_dir, "ms_wrapper.py")):
-    sys.path.insert(0, _script_dir)
+    sys.path.insert(0, os.path.join(_anytext2_repo, "ldm"))
+    print(f"[anytext2] using repo at {_anytext2_repo}")
 
 from schemas import (
     FontHint,
@@ -82,11 +81,9 @@ def load_model() -> None:
         )
         _model_loaded = True
         print(f"[anytext2] Model loaded on {DEVICE}")
-    except ImportError:
-        print(
-            "[anytext2] ms_wrapper not installed. Install with: "
-            "pip install ms_wrapper  (see https://github.com/tyxsspa/anytext2)"
-        )
+    except ImportError as e:
+        print(f"[anytext2] Missing dependency: {e}")
+        print("[anytext2] Install with: uv sync (from services/anytext2/)")
         raise
     except Exception as exc:
         print(f"[anytext2] Failed to load model: {exc}")

@@ -50,11 +50,22 @@ impl ServiceSpec {
             .stderr(Stdio::piped())
             .env("PORT", self.port.to_string());
 
-        // Inject ANYTEXT2_REPO_DIR pointing to the parent of services/anytext2
-        // so the server can import ms_wrapper.py from the repo root.
+        // Inject ANYTEXT2_REPO_DIR so the server can import ms_wrapper.py
+        // and its sibling modules (cldm, ldm, …). Look for a sibling `anytext2/`
+        // checkout next to the project root.
         if self.name == "anytext2" {
-            if let Some(parent) = PathBuf::from(&self.dir).parent() {
-                cmd.env("ANYTEXT2_REPO_DIR", parent);
+            let dir = PathBuf::from(&self.dir);
+            // services/anytext2 → services → KOHARU_ROOT → KOHARU_ROOT/../anytext2
+            let candidates = [
+                dir.parent().and_then(|p| p.parent()).map(|p| p.join("../anytext2")),
+                dir.parent().and_then(|p| p.parent()).map(|p| p.join("anytext2")),
+            ];
+            for c in candidates.iter().flatten() {
+                if c.join("ms_wrapper.py").exists() {
+                    cmd.env("ANYTEXT2_REPO_DIR", c);
+                    tracing::info!("anytext2: set ANYTEXT2_REPO_DIR={}", c.display());
+                    break;
+                }
             }
         }
 
