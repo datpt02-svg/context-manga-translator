@@ -8,14 +8,19 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "pydantic>=2.0.0",
     "Pillow>=10.0.0",
-    "torch>=2.0.0",
     "numpy>=1.24.0",
     "opencv-python>=4.8.0",
-    # ms_wrapper is a single-file module; installed separately via:
-    #   git clone https://github.com/tyxsspa/anytext2.git
-    #   pip install ./anytext2   (copies ms_wrapper.py + dependencies)
-    # Or set ANYTEXT2_REPO_DIR=path/to/anytext2 and import from there.
 ]
 
+[tool.uv.sources]
+torch = { index = "pytorch-gpu" }
+torchvision = { index = "pytorch-gpu" }
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
 [tool.uv]
-dev-dependencies = []
+# CUDA 12.4 torch by default. For CPU-only:
+#   UV_INDEX_PYTORCH="https://download.pytorch.org/whl/cpu" uv sync --no-build
