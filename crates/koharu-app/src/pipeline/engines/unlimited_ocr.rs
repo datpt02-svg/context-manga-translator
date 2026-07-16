@@ -73,11 +73,14 @@ impl Engine for Model {
             nodes.push((*node_id, *tf, *td));
         }
 
-        // Health check first
-        client
-            .health()
-            .await
-            .context("Unlimited-OCR service not available — is the Python service running?")?;
+        // Auto-spawn if not running
+        if client.health().await.is_err() {
+            let spawned = crate::services::ensure_running(&crate::services::UNLIMITED_OCR)
+                .context("Unlimited-OCR service not available")?;
+            if spawned.is_some() {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+        }
 
         // Send batch request
         let request = UnlimitedCropRequest {

@@ -159,11 +159,15 @@ impl Engine for Model {
             });
         }
 
-        // Health check first
-        client
-            .health()
-            .await
-            .with_context(|| "AnyText2 service not available")?;
+        // Auto-spawn if not running
+        if client.health().await.is_err() {
+            let spawned = crate::services::ensure_running(&crate::services::ANYTEXT2)
+                .context("AnyText2 service not available")?;
+            if spawned.is_some() {
+                // Give the HTTP server a moment to accept requests.
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+        }
 
         let request = RenderRequest {
             image_width: w,
