@@ -18,6 +18,17 @@ import torch
 from fastapi import FastAPI, HTTPException
 from PIL import Image
 
+# Monkey-patch: lightning_fabric 1.x still uses deprecated pkg_resources.
+# uv won't have it by default, so we create a minimal shim.
+try:
+    import pkg_resources  # noqa: F401
+except ModuleNotFoundError:
+    import types as _types
+    _pkg_res = _types.ModuleType("pkg_resources")
+    def _declare_ns(ns): pass
+    _pkg_res.declare_namespace = _declare_ns
+    sys.modules["pkg_resources"] = _pkg_res
+
 # ms_wrapper.py depends on sibling modules (cldm, ldm, lora_util, ...)
 # from the anytext2 repo. Auto-discover from the cloned checkout next to
 # the project root, or set ANYTEXT2_REPO_DIR explicitly.
