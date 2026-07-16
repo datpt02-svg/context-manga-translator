@@ -65,7 +65,7 @@ MODEL_DIR = os.environ.get("ANYTEXT2_MODEL_DIR", "")
 if not MODEL_DIR:
     MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 os.environ.setdefault("TRANSFORMERS_CACHE", MODEL_DIR)
-os.environ.setdefault("HUGGINGFACE_HUB_CACHE", MODEL_DIR)
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.join(MODEL_DIR, "hub"))
 FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "")
 if not FONT_PATH or not os.path.isfile(FONT_PATH):
     for _candidate in [
