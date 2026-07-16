@@ -216,6 +216,51 @@ impl GoogleFontService {
     pub fn find_entry(&self, family: &str) -> Option<&GoogleFontEntry> {
         self.catalog.fonts.iter().find(|e| e.family == family)
     }
+
+    /// Pick a Google Font that best approximates a predicted font's category
+    /// (serif / sans-serif) and script. Returns the family name, or None.
+    pub fn substitute_font(&self, serif: bool, language: Option<&str>) -> Option<&str> {
+        let target_cat = if serif { "serif" } else { "sans-serif" };
+        let target_subset = language_to_subset(language);
+
+        // Score each matching entry: prefer (subset match, any subset, then higher variant count).
+        let mut best: Option<&GoogleFontEntry> = None;
+        let mut best_score: i32 = -1;
+        for entry in &self.catalog.fonts {
+            if entry.category != target_cat {
+                continue;
+            }
+            let has_subset = entry.subsets.iter().any(|s| s == target_subset);
+            let score = if has_subset {
+                1000 + entry.variants.len() as i32
+            } else {
+                entry.variants.len() as i32
+            };
+            if score > best_score {
+                best_score = score;
+                best = Some(entry);
+            }
+        }
+        best.map(|e| e.family.as_str())
+    }
+}
+
+/// Map a font-prediction language tag to a Google Fonts subset name.
+fn language_to_subset(language: Option<&str>) -> &'static str {
+    match language.unwrap_or("") {
+        "ja" | "jpn" => "japanese",
+        "ko" | "kor" => "korean",
+        "zh-cn" | "zh-Hans" | "zh_hans" | "zh-hans" | "cjk" | "cjk_cn" => "chinese-simplified",
+        "zh-tw" | "zh-Hant" | "zh_hant" | "zh-hant" | "cjk_tw" => "chinese-traditional",
+        "vi" | "vie" => "vietnamese",
+        "th" => "thai",
+        "ar" => "arabic",
+        "he" | "iw" => "hebrew",
+        "hi" => "devanagari",
+        "ru" => "cyrillic",
+        "el" => "greek",
+        _ => "latin",
+    }
 }
 
 /// Converts family name to directory name (lowercase, spaces to empty).

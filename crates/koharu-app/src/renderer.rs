@@ -247,6 +247,18 @@ impl Renderer {
             && let Some(top) = pred.named_fonts.first()
         {
             style.font_families.push(top.name.clone());
+            // Append a Google Font substitute that matches the predicted
+            // font's category (serif/sans) and script, so select_font has a
+            // working fallback when the predicted name is a local-only file
+            // path label.
+            if let Some(sub) = self
+                .google_fonts
+                .substitute_font(top.serif, top.language.as_deref())
+            {
+                if !style.font_families.contains(&sub.to_string()) {
+                    style.font_families.push(sub.to_string());
+                }
+            }
         }
         if style.font_families.is_empty()
             && let Some(font) = document_font
