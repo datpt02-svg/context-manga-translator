@@ -46,35 +46,15 @@ impl Model {
 #[async_trait]
 impl Engine for Model {
     async fn run(&self, ctx: EngineCtx<'_>) -> Result<Vec<Op>> {
-        // Find the target surface: prefer inpainted, fall back to source.
-        let base = match find_image_node(ctx.scene, ctx.page, ImageRole::Inpainted) {
-            Some((_, blob)) => ctx.blobs.load_image(&blob)?,
-            None => load_source_image(ctx.scene, ctx.page, ctx.blobs)?,
-        };
-        let (w, h) = image_dimensions(&base);
-
-        // Brush layer (optional): overlay before text sprites.
-        let brush = match find_mask_node(ctx.scene, ctx.page, MaskRole::BrushInpaint) {
-            Some((_, blob)) => Some(ctx.blobs.load_image(&blob)?),
-            None => None,
-        };
+        // Load SOURCE image (has original text) and SEGMENT mask.
+        let source = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
+        let (w, h) = image_dimensions(&source);
+        let segment_mask = find_mask_node(ctx.scene, ctx.page, MaskRole::Segment)
+            .map(|(_, blob)| ctx.blobs.load_image(&blob))
+            .transpose()?;
 
         // Collect text nodes with translations.
         let nodes = text_nodes(ctx.scene, ctx.page);
-        if nodes.is_empty() {
-            // Nothing to render — still produce a Rendered composite.
-            let composite = composite_layers(&base, brush.as_ref(), &[])?;
-            let blob = ctx.blobs.put_webp(&composite)?;
-            return Ok(vec![upsert_image_blob(
-                ctx.scene,
-                ctx.page,
-                ImageRole::Rendered,
-                blob,
-                w,
-                h,
-            )]);
-        }
-
         let inputs: Vec<RenderBlockInput> = nodes
             .iter()
             .filter_map(|(id, transform, t)| {
@@ -96,45 +76,29 @@ impl Engine for Model {
             .collect();
 
         if inputs.is_empty() {
-            let composite = composite_layers(&base, brush.as_ref(), &[])?;
-            let blob = ctx.blobs.put_webp(&composite)?;
+            let blob = ctx.blobs.put_webp(&source)?;
             return Ok(vec![upsert_image_blob(
-                ctx.scene,
-                ctx.page,
-                ImageRole::Rendered,
-                blob,
-                w,
-                h,
+                ctx.scene, ctx.page, ImageRole::Rendered, blob, w, h,
             )]);
         }
 
-        let source = load_source_image(ctx.scene, ctx.page, ctx.blobs)?;
-
-        // Build the AnyText2 request.
         let url = self.resolve_url(ctx.options);
         let client = AnyText2Client::new(url);
-
-        // Encode page images
         let source_b64 = encode_png(&source);
-        let inpainted_b64 = encode_png(&base);
 
         let mut blocks: Vec<TextBlock> = Vec::with_capacity(inputs.len());
         for input in &inputs {
-            // Crop source + inpainted regions
-            let source_crop = crop_with_padding(&source, input.transform);
-            let inpainted_crop = crop_with_padding(&base, input.transform);
-
-            let text_color: Vec<u8> = input
-                .style
+            let crop = crop_with_padding(&source, input.transform);
+            let mask_crop = segment_mask
                 .as_ref()
-                .map(|s| s.color.to_vec())
-                .or_else(|| {
-                    input.font_prediction.as_ref().map(|p| {
-                        vec![p.text_color[0], p.text_color[1], p.text_color[2], 255]
-                    })
-                })
+                .map(|m| crop_with_padding(m, input.transform))
+                .unwrap_or_else(String::new);
+            let text_color: Vec<u8> = input
+                .style.as_ref().map(|s| s.color.to_vec())
+                .or_else(|| input.font_prediction.as_ref().map(|p| {
+                    vec![p.text_color[0], p.text_color[1], p.text_color[2], 255]
+                }))
                 .unwrap_or_else(|| vec![0, 0, 0, 255]);
-
             let font_hint = input.font_prediction.as_ref().map(|p| {
                 let top_font = p.named_fonts.first();
                 FontHint {
@@ -144,7 +108,6 @@ impl Engine for Model {
                     font_size_px: Some(p.font_size_px),
                 }
             });
-
             blocks.push(TextBlock {
                 id: input.node_id.to_string(),
                 translation: input.translation.clone(),
@@ -152,102 +115,70 @@ impl Engine for Model {
                 y: input.transform.y,
                 width: input.transform.width,
                 height: input.transform.height,
-                source_crop_base64: source_crop,
-                inpainted_crop_base64: inpainted_crop,
+                source_crop_base64: crop,
+                mask_crop_base64: mask_crop,
                 text_color,
                 font_hint,
             });
         }
 
-        // Auto-spawn if not running
         if client.health().await.is_err() {
             let spawned = crate::services::ensure_running(crate::services::anytext2_spec())
                 .context("AnyText2 service not available")?;
             if spawned.is_some() {
-                // Give the HTTP server a moment to accept requests.
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
         }
 
         let request = RenderRequest {
-            image_width: w,
-            image_height: h,
+            image_width: w, image_height: h,
             source_image_base64: source_b64,
-            inpainted_image_base64: inpainted_b64,
             blocks,
         };
-
         let response = client.render(request).await?;
 
-        // Decode rendered blocks + build ops
-        let mut rendered_blocks: Vec<RenderedBlock> = Vec::new();
         let mut ops = Vec::with_capacity(response.blocks.len() + 1);
-
         for rb in &response.blocks {
-            let decoded = decode_png(&rb.rendered_crop_base64)?;
-            let input = inputs
-                .iter()
-                .find(|i| i.node_id.to_string() == rb.id)
-                .unwrap_or_else(|| {
-                    // Should not happen; skip if no matching input.
-                    tracing::warn!("AnyText2 returned unmatched block id {}", rb.id);
-                    return &inputs[0];
-                });
-            let _ = input; // placeholder for alignment — matching below
-
-            // Store sprite (same format as koharu-renderer)
-            let node_id_str = rb.id.clone();
-            let node_id = inputs
-                .iter()
-                .find(|i| i.node_id.to_string() == node_id_str)
-                .map(|i| i.node_id);
-
-            if let Some(nid) = node_id {
-                // Build sprite image matching original crop size
-                let sprite = DynamicImage::ImageRgba8(decoded);
-                let sprite_ref = ctx.blobs.put_raw(&sprite)?;
-
-                rendered_blocks.push(RenderedBlock {
-                    node_id: nid,
-                    sprite: sprite.clone(),
-                    rendered_direction: koharu_core::TextDirection::Horizontal,
-                    expanded_transform: None,
-                });
-
-                let existing_style = inputs
-                    .iter()
-                    .find(|i| i.node_id == nid)
-                    .and_then(|i| i.style.clone());
-
-                ops.push(Op::UpdateNode {
-                    page: ctx.page,
-                    id: nid,
-                    patch: NodePatch {
-                        data: Some(NodeDataPatch::Text(TextDataPatch {
-                            sprite: Some(Some(sprite_ref)),
-                            sprite_transform: Some(None),
-                            rendered_direction: Some(Some(koharu_core::TextDirection::Horizontal)),
-                            style: preserve_existing_style(existing_style),
-                            ..Default::default()
-                        })),
-                        transform: None,
-                        visible: None,
-                    },
-                    prev: NodePatch::default(),
-                });
-            }
+            let rendered = decode_png(&rb.rendered_crop_base64)?;
+            let nid = match inputs.iter().find(|i| i.node_id.to_string() == rb.id) {
+                Some(i) => i.node_id,
+                None => continue,
+            };
+            let sprite = DynamicImage::ImageRgba8(rendered);
+            let sprite_ref = ctx.blobs.put_raw(&sprite)?;
+            let existing_style = inputs.iter().find(|i| i.node_id == nid)
+                .and_then(|i| i.style.clone());
+            ops.push(Op::UpdateNode {
+                page: ctx.page, id: nid,
+                patch: NodePatch {
+                    data: Some(NodeDataPatch::Text(TextDataPatch {
+                        sprite: Some(Some(sprite_ref)),
+                        sprite_transform: Some(None),
+                        rendered_direction: Some(Some(koharu_core::TextDirection::Horizontal)),
+                        style: preserve_existing_style(existing_style),
+                        ..Default::default()
+                    })),
+                    transform: None, visible: None,
+                },
+                prev: NodePatch::default(),
+            });
         }
 
-        // Final composite → Image { Rendered } upsert.
-        let composite = composite_layers(&base, brush.as_ref(), &rendered_blocks)?;
-        let final_blob = ctx.blobs.put_webp(&composite)?;
+        // Composite final: source + overlay rendered sprites.
+        let mut canvas = source.to_rgba8();
+        for op in &ops {
+            if let Op::UpdateNode { patch, .. } = op {
+                if let Some(NodeDataPatch::Text(tp)) = &patch.data {
+                    if let Some(Some(blob)) = &tp.sprite {
+                        let img = ctx.blobs.load_image(blob)?;
+                        imageops::overlay(&mut canvas, &img.to_rgba8(), 0, 0);
+                    }
+                }
+            }
+        }
+        let final_blob = ctx.blobs.put_webp(&DynamicImage::ImageRgba8(canvas))?;
         ops.push(upsert_image_blob(
-            ctx.scene,
-            ctx.page,
-            ImageRole::Rendered,
-            final_blob,
-            w,
-            h,
+            ctx.scene, ctx.page, ImageRole::Rendered, final_blob, w, h,
         ));
         Ok(ops)
     }
@@ -258,7 +189,7 @@ inventory::submit! {
         id: "anytext2",
         name: "AnyText2 Diffusion Renderer",
         needs: &[
-            Artifact::Inpainted,
+            Artifact::TextBoxes,
             Artifact::Translations,
             Artifact::FontPredictions,
         ],

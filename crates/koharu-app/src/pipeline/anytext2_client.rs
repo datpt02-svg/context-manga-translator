@@ -29,7 +29,7 @@ pub struct TextBlock {
     pub width: f32,
     pub height: f32,
     pub source_crop_base64: String,
-    pub inpainted_crop_base64: String,
+    pub mask_crop_base64: String,
     pub text_color: Vec<u8>,
     pub font_hint: Option<FontHint>,
 }
@@ -40,7 +40,6 @@ pub struct RenderRequest {
     pub image_width: u32,
     pub image_height: u32,
     pub source_image_base64: String,
-    pub inpainted_image_base64: String,
     pub blocks: Vec<TextBlock>,
 }
 
@@ -147,7 +146,7 @@ mod tests {
             image_width: 1920,
             image_height: 2560,
             source_image_base64: "fake".to_string(),
-            inpainted_image_base64: "fake".to_string(),
+            
             blocks: vec![TextBlock {
                 id: "n1".to_string(),
                 translation: "Hello".to_string(),
@@ -156,7 +155,7 @@ mod tests {
                 width: 100.0,
                 height: 50.0,
                 source_crop_base64: "crop".to_string(),
-                inpainted_crop_base64: "crop2".to_string(),
+                mask_crop_base64: "mask".to_string(),
                 text_color: vec![0, 0, 0, 255],
                 font_hint: Some(FontHint {
                     serif: false,

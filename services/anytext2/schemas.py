@@ -22,7 +22,8 @@ class TextBlock(BaseModel):
     width: float
     height: float
     sourceCropBase64: str
-    inpaintedCropBase64: str
+    maskCropBase64: str
+    """Crop from the segment mask (white = text pixels to inpaint)."""
     textColor: list[int] = [0, 0, 0, 255]
     fontHint: FontHint | None = None
 
@@ -31,7 +32,6 @@ class RenderRequest(BaseModel):
     imageWidth: int
     imageHeight: int
     sourceImageBase64: str
-    inpaintedImageBase64: str
     blocks: list[TextBlock]
 
 
