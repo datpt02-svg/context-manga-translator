@@ -200,6 +200,7 @@ def _render_block(
         "strength": 0.8,
         "cfg_scale": 7.5,
         "text_colors": f"{text_color[0]},{text_color[1]},{text_color[2]}",
+        "font_hint_image": [],
     }
 
     results, code, warning_msg, debug_info = _inference(input_data, **params)  # type: ignore[misc]
