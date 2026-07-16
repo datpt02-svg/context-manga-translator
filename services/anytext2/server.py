@@ -23,8 +23,12 @@ from PIL import Image
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 _anytext2_repo = os.environ.get("ANYTEXT2_REPO_DIR")
 if not _anytext2_repo:
-    # Traverse up from services/anytext2/ to find ../anytext2
-    _candidate = os.path.join(os.path.dirname(os.path.dirname(_script_dir)), "anytext2")
+    # Traverse up from services/anytext2/ to find anytext2/ sibling to project root.
+    # services/anytext2/server.py → services/anytext2 → services → project root → anytext2
+    _candidate = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(_script_dir))),
+        "anytext2",
+    )
     if os.path.isdir(_candidate):
         _anytext2_repo = _candidate
 if _anytext2_repo and os.path.isdir(_anytext2_repo):
