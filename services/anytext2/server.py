@@ -10,6 +10,7 @@ import base64
 import os
 import sys
 import traceback
+import pathlib
 
 import cv2
 import numpy as np
@@ -33,7 +34,7 @@ if not _anytext2_repo:
         _anytext2_repo = _candidate
 if _anytext2_repo and os.path.isdir(_anytext2_repo):
     sys.path.insert(0, _anytext2_repo)
-    sys.path.insert(0, os.path.join(_anytext2_repo, "ldm"))
+    # Don't add ldm/ — it shadows the root util.py that has check_channels.
     print(f"[anytext2] using repo at {_anytext2_repo}")
 
 from schemas import (
