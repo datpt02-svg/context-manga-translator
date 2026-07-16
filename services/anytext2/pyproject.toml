@@ -11,7 +11,10 @@ dependencies = [
     "torch>=2.0.0",
     "numpy>=1.24.0",
     "opencv-python>=4.8.0",
-    "ms_wrapper @ git+https://github.com/tyxsspa/anytext2.git",
+    # ms_wrapper is a single-file module; installed separately via:
+    #   git clone https://github.com/tyxsspa/anytext2.git
+    #   pip install ./anytext2   (copies ms_wrapper.py + dependencies)
+    # Or set ANYTEXT2_REPO_DIR=path/to/anytext2 and import from there.
 ]
 
 [tool.uv]

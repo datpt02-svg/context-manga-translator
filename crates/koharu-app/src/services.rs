@@ -39,7 +39,6 @@ pub struct ServiceSpec {
     pub startup_timeout_secs: u16,
     /// Absolute path to the service directory.
     pub dir: String,
-    pub env: &'static [(&'static str, &'static str)],
 }
 
 impl ServiceSpec {
@@ -51,8 +50,12 @@ impl ServiceSpec {
             .stderr(Stdio::piped())
             .env("PORT", self.port.to_string());
 
-        for (k, v) in self.env {
-            cmd.env(k, v);
+        // Inject ANYTEXT2_REPO_DIR pointing to the parent of services/anytext2
+        // so the server can import ms_wrapper.py from the repo root.
+        if self.name == "anytext2" {
+            if let Some(parent) = PathBuf::from(&self.dir).parent() {
+                cmd.env("ANYTEXT2_REPO_DIR", parent);
+            }
         }
 
         tracing::info!("[{}] spawning: uv run python server.py", self.name);
@@ -119,7 +122,6 @@ pub fn unlimited_ocr_spec() -> &'static ServiceSpec {
         port: 7862,
         startup_timeout_secs: 120,
         dir: resolve_service_dir("services/unlimited-ocr"),
-        env: &[],
     })
 }
 
@@ -130,7 +132,6 @@ pub fn anytext2_spec() -> &'static ServiceSpec {
         port: 7863,
         startup_timeout_secs: 180,
         dir: resolve_service_dir("services/anytext2"),
-        env: &[],
     })
 }
 

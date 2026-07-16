@@ -7,7 +7,6 @@ Loads the model once at startup; per-block editing via POST /render.
 from __future__ import annotations
 
 import base64
-import io
 import os
 import sys
 import traceback
@@ -17,6 +16,15 @@ import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException
 from PIL import Image
+
+# ms_wrapper is not pip-installable. Set ANYTEXT2_REPO_DIR to the cloned
+# repo path, or place ms_wrapper.py alongside this file.
+_anytext2_repo = os.environ.get("ANYTEXT2_REPO_DIR")
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if _anytext2_repo and os.path.isdir(_anytext2_repo):
+    sys.path.insert(0, _anytext2_repo)
+elif os.path.isfile(os.path.join(_script_dir, "ms_wrapper.py")):
+    sys.path.insert(0, _script_dir)
 
 from schemas import (
     FontHint,
