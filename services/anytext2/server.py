@@ -61,7 +61,11 @@ app = FastAPI(title="AnyText2 Renderer", version="0.1.0")
 # ---------------------------------------------------------------------------
 # Configuration from env
 # ---------------------------------------------------------------------------
-MODEL_DIR = os.environ.get("ANYTEXT2_MODEL_DIR", "./models")
+MODEL_DIR = os.environ.get("ANYTEXT2_MODEL_DIR", "")
+if not MODEL_DIR:
+    MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+os.environ.setdefault("TRANSFORMERS_CACHE", MODEL_DIR)
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", MODEL_DIR)
 FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "")
 if not FONT_PATH or not os.path.isfile(FONT_PATH):
     for _candidate in [
