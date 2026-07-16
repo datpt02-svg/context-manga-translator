@@ -67,15 +67,23 @@ if not MODEL_DIR:
 os.environ.setdefault("TRANSFORMERS_CACHE", os.path.join(MODEL_DIR, "hub"))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.join(MODEL_DIR, "hub"))
 
-# Monkey-patch: ms_wrapper passes a local path as HF repo id.
-# Intercept hf_hub_download to rewrite local paths before validation.
+# Monkey-patch must be applied BEFORE transformers is imported.
+# ms_wrapper passes a local path as HF repo id; redirect to real repo.
 import huggingface_hub.file_download as _fd
 _orig_dl = _fd.hf_hub_download
 def _patched_dl(repo_id, *a, **kw):
-    if repo_id and "clip-vit-large-patch14" in repo_id:
+    if repo_id and "clip-vit-large-patch14" in repo_id and os.sep in repo_id:
         repo_id = "openai/clip-vit-large-patch14"
     return _orig_dl(repo_id, *a, **kw)
 _fd.hf_hub_download = _patched_dl
+# Also patch cached_files which re-validates the repo id.
+import transformers.utils.hub as _hub
+_orig_cached_files = _hub.cached_files
+def _patched_cached_files(path_or_repo_id, *a, **kw):
+    if path_or_repo_id and "clip-vit-large-patch14" in path_or_repo_id and os.sep in path_or_repo_id:
+        path_or_repo_id = "openai/clip-vit-large-patch14"
+    return _orig_cached_files(path_or_repo_id, *a, **kw)
+_hub.cached_files = _patched_cached_files
 FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "")
 if not FONT_PATH or not os.path.isfile(FONT_PATH):
     for _candidate in [
