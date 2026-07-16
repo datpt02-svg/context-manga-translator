@@ -253,7 +253,15 @@ impl Renderer {
         {
             style.font_families.push(font.to_string());
         }
-        apply_default_font_families(&mut style.font_families, translation);
+        // Always append script-based fallback fonts so select_font has a
+        // working candidate when the predicted font name is a training-path
+        // label that doesn't exist on the current machine.
+        let script_fallbacks = font_families_for_text(translation);
+        for fb in &script_fallbacks {
+            if !style.font_families.contains(fb) {
+                style.font_families.push(fb.clone());
+            }
+        }
         // Use predicted font size when the block has no explicit size set.
         if style.font_size.is_none()
             && let Some(pred) = block.font_prediction.as_ref()
