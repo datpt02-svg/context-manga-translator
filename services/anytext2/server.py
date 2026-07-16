@@ -64,8 +64,18 @@ app = FastAPI(title="AnyText2 Renderer", version="0.1.0")
 MODEL_DIR = os.environ.get("ANYTEXT2_MODEL_DIR", "")
 if not MODEL_DIR:
     MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
-os.environ.setdefault("TRANSFORMERS_CACHE", MODEL_DIR)
+os.environ.setdefault("TRANSFORMERS_CACHE", os.path.join(MODEL_DIR, "hub"))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.join(MODEL_DIR, "hub"))
+
+# Monkey-patch: ms_wrapper passes a local path as HF repo id.
+# Intercept cached_file to rewrite local paths to HF repo names.
+import transformers.utils.hub as _hub
+_orig_cf = _hub.cached_file
+def _patched_cf(pid, *a, **kw):
+    if pid and "clip-vit-large-patch14" in pid.replace("\\", "/"):
+        pid = "openai/clip-vit-large-patch14"
+    return _orig_cf(pid, *a, **kw)
+_hub.cached_file = _patched_cf
 FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "")
 if not FONT_PATH or not os.path.isfile(FONT_PATH):
     for _candidate in [
