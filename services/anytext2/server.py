@@ -81,7 +81,7 @@ if not FONT_PATH or not os.path.isfile(FONT_PATH):
     FONT_PATH = "font/Arial_Unicode.ttf"
 MODEL_PATH = os.environ.get("ANYTEXT2_MODEL_PATH", "models/anytext_v2.0.ckpt")
 DEVICE = os.environ.get("ANYTEXT2_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
-USE_FP16 = os.environ.get("ANYTEXT2_FP16", "1") == "1"
+USE_FP16 = os.environ.get("ANYTEXT2_FP16", "0") == "1"
 MAX_IMAGE_SIDE = int(os.environ.get("ANYTEXT2_MAX_SIDE", "2048"))
 
 # ---------------------------------------------------------------------------
