@@ -26,6 +26,7 @@ dependencies = [
     "scikit-image>=0.24.0",
     "datasets>=3.0.0",
     "diffusers>=0.30.0",
+    "pytorch-lightning>=2.4.0",
 ]
 
 [tool.uv.sources]
