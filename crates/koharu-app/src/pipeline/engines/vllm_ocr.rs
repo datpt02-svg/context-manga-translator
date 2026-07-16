@@ -9,6 +9,9 @@
 //! Sends one request per crop (simplest mapping), parses
 //! `choices[0].message.content`.
 
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use anyhow::{Context, Result};
 use tracing;
 use async_trait::async_trait;
@@ -22,6 +25,8 @@ use crate::pipeline::artifacts::Artifact;
 use crate::pipeline::engine::{Engine, EngineCtx, EngineInfo, PipelineRunOptions};
 use crate::pipeline::engines::support::{load_source_image, text_node_to_region, text_nodes};
 use crate::pipeline::ocr_quality::{OcrQualityInput, assess_ocr_quality};
+use crate::pipeline::{ProgressTick};
+
 
 const DEFAULT_MAX_TOKENS: u32 = 20000;
 
@@ -159,6 +164,9 @@ impl Engine for Model {
             .collect::<Vec<_>>();
 
         // Phase 2 — concurrent OCR requests (vLLM batches internally).
+        let total = jobs.len();
+        let completed = Arc::new(AtomicUsize::new(0));
+        let progress = ctx.progress.clone();
         let concurrency = 2usize;
         let results: Vec<(usize, NodeId, f32, bool, f32, f32, Result<String>)> =
             futures::stream::iter(jobs.into_iter().enumerate().map(
@@ -167,6 +175,8 @@ impl Engine for Model {
                     let model = settings.model.clone();
                     let api_key = settings.api_key.clone();
                     let system_prompt = settings.system_prompt.clone();
+                    let completed = completed.clone();
+                    let progress = progress.clone();
                     async move {
                         let text = ocr_one_crop(
                             &self.client,
@@ -179,6 +189,21 @@ impl Engine for Model {
                             &job.b64,
                         )
                         .await;
+                        // Emit intermediate progress so the UI shows
+                        // "OCR N/M" within the vLLM step.
+                        if let Some(ref sink) = progress {
+                            let done = completed.fetch_add(1, Ordering::SeqCst) + 1;
+                            sink(ProgressTick {
+                                step: None,
+                                step_id: "vllm-ocr".into(),
+                                step_index: done,
+                                total_steps: total,
+                                page_index: 0,
+                                total_pages: 1,
+                                overall_percent: (done * 100 / total) as u8,
+                                detail: Some(format!("OCR {done}/{total}")),
+                            });
+                        }
                         (
                             i,
                             job.node_id,

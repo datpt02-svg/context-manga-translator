@@ -173,6 +173,7 @@ function JobCard({ job, onCancel, t }: { job: JobEntry; onCancel: () => void; t:
       : undefined
   const subtitle =
     [pageText, stepLabel].filter(Boolean).join(' \u00b7 ') || t('operations.inProgress')
+  const detail = progress?.detail ?? undefined
   const warnings = job.warnings ?? []
 
   return (
@@ -186,6 +187,9 @@ function JobCard({ job, onCancel, t }: { job: JobEntry; onCancel: () => void; t:
                 {t('operations.processCurrent')}
               </div>
               <div className='text-xs text-muted-foreground'>{subtitle}</div>
+              {detail && (
+                <div className='text-xs text-muted-foreground/70'>{detail}</div>
+              )}
             </div>
           </div>
           <ProgressBar percent={percent} />

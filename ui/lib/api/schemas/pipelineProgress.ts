@@ -10,6 +10,8 @@ export interface PipelineProgress {
   currentPage: number;
   /** @minimum 0 */
   currentStepIndex: number;
+  /** Human-readable sub-step detail (e.g. "OCR 12/30") */
+  detail?: string | null;
   jobId: string;
   /** @minimum 0 */
   overallPercent: number;

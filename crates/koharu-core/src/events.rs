@@ -104,6 +104,11 @@ pub struct PipelineProgress {
     pub current_step_index: usize,
     pub total_steps: usize,
     pub overall_percent: u8,
+    /// Human-readable sub-step detail (e.g. "12/30 text boxes OCR'd").
+    /// Engines that perform many small sub-tasks set this on intermediate
+    /// ticks so the UI shows granular progress within a single step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, JsonSchema, ToSchema)]
@@ -229,6 +234,7 @@ mod tests {
             current_step_index: 2,
             total_steps: 5,
             overall_percent: 40,
+            detail: None,
         };
         let encoded = serde_json::to_string(&value).expect("serialize");
         let _: PipelineProgress = serde_json::from_str(&encoded).expect("deserialize");
