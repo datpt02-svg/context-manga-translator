@@ -18,8 +18,15 @@ from fastapi import FastAPI, HTTPException
 from PIL import Image
 
 # ms_wrapper.py depends on sibling modules (cldm, ldm, lora_util, ...)
-# from the anytext2 repo. Set ANYTEXT2_REPO_DIR to the cloned repo path.
+# from the anytext2 repo. Auto-discover from the cloned checkout next to
+# the project root, or set ANYTEXT2_REPO_DIR explicitly.
+_script_dir = os.path.dirname(os.path.abspath(__file__))
 _anytext2_repo = os.environ.get("ANYTEXT2_REPO_DIR")
+if not _anytext2_repo:
+    # Traverse up from services/anytext2/ to find ../anytext2
+    _candidate = os.path.join(os.path.dirname(os.path.dirname(_script_dir)), "anytext2")
+    if os.path.isdir(_candidate):
+        _anytext2_repo = _candidate
 if _anytext2_repo and os.path.isdir(_anytext2_repo):
     sys.path.insert(0, _anytext2_repo)
     sys.path.insert(0, os.path.join(_anytext2_repo, "ldm"))
