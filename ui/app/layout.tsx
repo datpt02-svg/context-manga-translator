@@ -5,7 +5,7 @@ import './globals.css'
 import Providers from '@/app/providers'
 
 const inter = Inter({
-  subsets: ['latin'],
+  subsets: ['latin', 'vietnamese'],
   variable: '--font-inter',
 })
 

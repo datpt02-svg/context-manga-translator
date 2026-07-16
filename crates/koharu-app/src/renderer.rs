@@ -239,12 +239,28 @@ impl Renderer {
             stroke: None,
             text_align: None,
         });
+
+        // Prepend the top predicted font name so it takes priority over
+        // script-based fallbacks — matches the detected font from the source.
+        if style.font_families.is_empty()
+            && let Some(pred) = block.font_prediction.as_ref()
+            && let Some(top) = pred.named_fonts.first()
+        {
+            style.font_families.push(top.name.clone());
+        }
         if style.font_families.is_empty()
             && let Some(font) = document_font
         {
             style.font_families.push(font.to_string());
         }
         apply_default_font_families(&mut style.font_families, translation);
+        // Use predicted font size when the block has no explicit size set.
+        if style.font_size.is_none()
+            && let Some(pred) = block.font_prediction.as_ref()
+            && pred.font_size_px > 0.0
+        {
+            style.font_size = Some(pred.font_size_px);
+        }
 
         let font = self.select_font(&style)?;
         let block_effect = style.effect.unwrap_or(*effect);
@@ -922,21 +938,23 @@ fn resolve_stroke_style(
 
 fn resolve_text_color(
     explicit_style: Option<&TextStyle>,
-    derived_style: &TextStyle,
+    _derived_style: &TextStyle,
     font_prediction: Option<&FontPrediction>,
 ) -> [u8; 4] {
-    if explicit_style.is_some() {
-        return derived_style.color;
-    }
     if let Some(pred) = font_prediction {
-        return [
-            pred.text_color[0],
-            pred.text_color[1],
-            pred.text_color[2],
-            255,
-        ];
+        let predicted = [pred.text_color[0], pred.text_color[1], pred.text_color[2], 255];
+        // If the only style color we have is the implicit default black, prefer
+        // the detector's predicted color — that's the source image's actual text
+        // colour, not a user override.
+        match explicit_style {
+            Some(s) if s.color != [0, 0, 0, 255] => return s.color,
+            _ => return predicted,
+        }
     }
-    [0, 0, 0, 255]
+    match explicit_style {
+        Some(s) => s.color,
+        None => [0, 0, 0, 255],
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -120,11 +120,19 @@ const predictionColor = (prediction?: FontPrediction | null): number[] | undefin
   return [clampByte(tc[0]), clampByte(tc[1]), clampByte(tc[2]), 255]
 }
 
-// Mirrors renderer precedence: explicit style color → predicted color → black.
-const effectiveColorOf = (style?: TextStyle | null, prediction?: FontPrediction | null): number[] =>
-  style?.color ?? predictionColor(prediction) ?? DEFAULT_COLOR
+// Mirrors renderer resolve_text_color: if style has a non-default color, use it.
+// Otherwise fall through to predicted color, then black.
+const isDefaultBlack = (c: number[]) => c?.length >= 3 && c[0] === 0 && c[1] === 0 && c[2] === 0
 
-const hasExplicitColor = (node: TextNodeEntry) => Array.isArray(node.data.style?.color)
+const effectiveColorOf = (style?: TextStyle | null, prediction?: FontPrediction | null): number[] =>
+  style?.color && !isDefaultBlack(style.color)
+    ? style.color
+    : predictionColor(prediction) ?? DEFAULT_COLOR
+
+const hasExplicitColor = (node: TextNodeEntry) => {
+  const c = node.data.style?.color
+  return Array.isArray(c) && !isDefaultBlack(c)
+}
 
 export function RenderControlsPanel() {
   const { t } = useTranslation()
