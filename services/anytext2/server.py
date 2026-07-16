@@ -68,14 +68,14 @@ os.environ.setdefault("TRANSFORMERS_CACHE", os.path.join(MODEL_DIR, "hub"))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.path.join(MODEL_DIR, "hub"))
 
 # Monkey-patch: ms_wrapper passes a local path as HF repo id.
-# Intercept cached_file to rewrite local paths to HF repo names.
-import transformers.utils.hub as _hub
-_orig_cf = _hub.cached_file
-def _patched_cf(pid, *a, **kw):
-    if pid and "clip-vit-large-patch14" in pid.replace("\\", "/"):
-        pid = "openai/clip-vit-large-patch14"
-    return _orig_cf(pid, *a, **kw)
-_hub.cached_file = _patched_cf
+# Rewrite to real HF repo names before validation.
+from huggingface_hub.utils._validators import validate_repo_id as _orig_vr
+def _patched_vr(repo_id):
+    if repo_id and "clip-vit-large-patch14" in repo_id:
+        repo_id = "openai/clip-vit-large-patch14"
+    return _orig_vr(repo_id)
+import huggingface_hub.utils._validators as _validators
+_validators.validate_repo_id = _patched_vr
 FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "")
 if not FONT_PATH or not os.path.isfile(FONT_PATH):
     for _candidate in [
