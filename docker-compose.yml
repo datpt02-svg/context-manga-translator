@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  # ── AnyText2 diffusion renderer ──────────────────────────────
+  anytext2:
+    build:
+      context: ./services/anytext2
+      dockerfile: Dockerfile
+    image: koharu/anytext2:latest
+    ports:
+      - "7863:7863"
+    volumes:
+      - anytext2-models:/app/models
+    environment:
+      - ANYTEXT2_DEVICE=cuda
+      - ANYTEXT2_FP16=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # ── Unlimited-OCR sidecar ────────────────────────────────────
+  unlimited-ocr:
+    build:
+      context: ./services/unlimited-ocr
+      dockerfile: Dockerfile
+    image: koharu/unlimited-ocr:latest
+    ports:
+      - "7862:7862"
+    environment:
+      - UNLIMITED_OCR_DEVICE=cuda
+    volumes:
+      - unlimited-ocr-models:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  anytext2-models:
+  unlimited-ocr-models:
