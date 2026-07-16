@@ -296,11 +296,13 @@ impl Renderer {
             .map(core_align_to_renderer)
             .unwrap_or(RendererTextAlign::Center);
         let layout_box = resolved_box.layout_box;
+        let block_min_font = min_font_size_for_box(layout_box, min_font_size);
 
         let mut layout_builder = TextLayout::new(&font, None)
             .with_fallback_fonts(&self.symbol_fallbacks)
             .with_writing_mode(writing_mode)
-            .with_alignment(align);
+            .with_alignment(align)
+            .with_line_height_scale(1.3);
         if let Some(target_language) = target_language {
             layout_builder = layout_builder.with_hyphenation_language_tag(target_language);
         }
@@ -344,7 +346,7 @@ impl Renderer {
                 translation,
                 layout_box,
                 style.font_size,
-                min_font_size,
+                block_min_font,
                 max_font,
                 mask,
                 bubble_id,
@@ -364,7 +366,7 @@ impl Renderer {
             layout_box.width,
             layout_box.height,
             style.font_size,
-            min_font_size,
+            block_min_font,
             max_font,
         )?;
 
@@ -512,14 +514,21 @@ struct MaskCollisionAttempt {
 
 fn min_font_size_for_image(image_width: u32, image_height: u32) -> f32 {
     let max_dim = image_width.max(image_height) as f32;
-    (max_dim / 90.0).clamp(12.0, 28.0)
+    (max_dim / 60.0).clamp(14.0, 36.0)
+}
+
+/// Minimum font size for a given layout box, used per-block as a higher floor
+/// so short text in a large bubble doesn't stay tiny.
+fn min_font_size_for_box(layout_box: LayoutBox, global_min: f32) -> f32 {
+    let by_box = layout_box.height.max(layout_box.width) / 5.0;
+    by_box.max(global_min)
 }
 
 /// Maximum font size for the given layout box, derived from its dimensions.
 /// Caps extreme cases (huge empty bubble + short text → giant glyphs).
 fn max_font_size_for_box(layout_box: LayoutBox, min_size: f32) -> f32 {
-    const GLOBAL_CAP_PX: f32 = 72.0;
-    let by_height = layout_box.height * 0.45;
+    const GLOBAL_CAP_PX: f32 = 120.0;
+    let by_height = layout_box.height * 0.55;
     let by_width = layout_box.width * 0.9;
     by_height.min(by_width).clamp(min_size + 1.0, GLOBAL_CAP_PX)
 }
@@ -804,22 +813,16 @@ fn resolve_layout_boxes(
     matches
         .into_iter()
         .map(|(seed_box, bubble_match)| match bubble_match {
-            // Connected bubbles can contain multiple independently detected
-            // text blocks. Expanding all of them to the same safe area makes
-            // their layouts collide, so shared bubbles keep each block's
-            // original detector box.
-            Some(matched) if counts.get(&matched.id).copied().unwrap_or(0) == 1 => {
+            Some(matched) => {
+                // Expand into the bubble's safe area even when multiple
+                // blocks share one bubble — the collision check in
+                // render_one prevents overlapping sprite output.
                 ResolvedLayoutBox {
                     seed_box,
                     layout_box: matched.layout_box,
                     bubble_id: Some(matched.id),
                 }
             }
-            Some(matched) => ResolvedLayoutBox {
-                seed_box,
-                layout_box: seed_box,
-                bubble_id: Some(matched.id),
-            },
             None => ResolvedLayoutBox {
                 seed_box,
                 layout_box: seed_box,
@@ -1192,7 +1195,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_bubble_keeps_seed_boxes_to_avoid_overlap() {
+    fn shared_bubble_expands_both_blocks_into_safe_area() {
         let mut mask = GrayImage::from_pixel(200, 200, Luma([0u8]));
         paint_rect(&mut mask, 10, 10, 190, 190, 1);
         let index = BubbleIndex::new(mask);
@@ -1203,10 +1206,12 @@ mod tests {
 
         let layout_boxes = resolve_layout_boxes(&blocks, Some(&index));
 
-        assert_eq!(layout_boxes[0].layout_box, seed_layout_box(&blocks[0]));
+        // Both blocks still belong to bubble 1 (shared), but now both
+        // expand into the bubble's safe area for larger layouts.
         assert_eq!(layout_boxes[0].bubble_id, Some(1));
-        assert_eq!(layout_boxes[1].layout_box, seed_layout_box(&blocks[1]));
         assert_eq!(layout_boxes[1].bubble_id, Some(1));
+        assert!(layout_boxes[0].layout_box.width > blocks[0].transform.width);
+        assert!(layout_boxes[1].layout_box.width > blocks[1].transform.width);
     }
 
     #[test]

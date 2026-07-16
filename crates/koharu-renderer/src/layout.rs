@@ -106,6 +106,7 @@ pub struct TextLayout<'a> {
     max_width: Option<f32>,
     max_height: Option<f32>,
     alignment: Option<TextAlign>,
+    line_height_scale: f32,
 }
 
 impl<'a> TextLayout<'a> {
@@ -120,6 +121,7 @@ impl<'a> TextLayout<'a> {
             max_width: None,
             max_height: None,
             alignment: None,
+            line_height_scale: 1.0,
         }
     }
 
@@ -170,6 +172,11 @@ impl<'a> TextLayout<'a> {
 
     pub fn with_alignment(mut self, alignment: TextAlign) -> Self {
         self.alignment = Some(alignment);
+        self
+    }
+
+    pub fn with_line_height_scale(mut self, scale: f32) -> Self {
+        self.line_height_scale = scale;
         self
     }
 
@@ -239,7 +246,8 @@ impl<'a> TextLayout<'a> {
         let metrics = font_ref.metrics(Size::new(font_size), LocationRef::default());
         let ascent = metrics.ascent;
         let descent = -metrics.descent;
-        let line_height = (ascent + descent + metrics.leading).max(font_size);
+        let raw_line_height = (ascent + descent + metrics.leading).max(font_size);
+        let line_height = raw_line_height * self.line_height_scale;
 
         let bidi_info = BidiInfo::new(text, None);
 
