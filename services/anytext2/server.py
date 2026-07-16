@@ -51,7 +51,19 @@ app = FastAPI(title="AnyText2 Renderer", version="0.1.0")
 # Configuration from env
 # ---------------------------------------------------------------------------
 MODEL_DIR = os.environ.get("ANYTEXT2_MODEL_DIR", "./models")
-FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "font/Arial_Unicode.ttf")
+FONT_PATH = os.environ.get("ANYTEXT2_FONT_PATH", "")
+if not FONT_PATH or not os.path.isfile(FONT_PATH):
+    for _candidate in [
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/Arial.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    ]:
+        if os.path.isfile(_candidate):
+            FONT_PATH = _candidate
+            break
+if not FONT_PATH or not os.path.isfile(FONT_PATH):
+    print("[anytext2] WARNING: no TrueType font found; set ANYTEXT2_FONT_PATH")
+    FONT_PATH = "font/Arial_Unicode.ttf"
 MODEL_PATH = os.environ.get("ANYTEXT2_MODEL_PATH", "models/anytext_v2.0.ckpt")
 DEVICE = os.environ.get("ANYTEXT2_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 USE_FP16 = os.environ.get("ANYTEXT2_FP16", "1") == "1"
