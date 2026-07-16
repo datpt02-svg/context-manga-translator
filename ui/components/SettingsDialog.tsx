@@ -113,6 +113,7 @@ function appConfigToPatch(cfg: AppConfig): ConfigPatch {
       renderer: cfg.pipeline.renderer,
       unlimitedOcrMode: cfg.pipeline.unlimited_ocr_mode ?? null,
       unlimitedOcrUrl: cfg.pipeline.unlimited_ocr_url ?? null,
+      anytext2Url: cfg.pipeline.anytext2_url ?? null,
       detectorConfidenceThreshold: cfg.pipeline.detector_confidence_threshold ?? null,
       segmenterBinaryThreshold: cfg.pipeline.segmenter_binary_threshold ?? null,
       comicTextBubbleDetectorClasses:
@@ -793,6 +794,28 @@ export function EnginesPane({
               value={pipeline.unlimited_ocr_url ?? 'http://127.0.0.1:7862'}
               onChange={(e) => onChange({ ...pipeline, unlimited_ocr_url: e.target.value || null })}
               placeholder='http://127.0.0.1:7862'
+            />
+          </div>
+        )}
+      </div>
+      {/* ── AnyText2 renderer ── */}
+      <div className='space-y-3 pt-2'>
+        <div className='flex items-center justify-between'>
+          <Label className='text-xs'>{t('settings.anytext2')}</Label>
+          <Switch
+            checked={pipeline.renderer === 'anytext2'}
+            onCheckedChange={(v) =>
+              onChange({ ...pipeline, renderer: v ? 'anytext2' : 'koharu-renderer' })
+            }
+          />
+        </div>
+        {pipeline.renderer === 'anytext2' && (
+          <div className='space-y-1.5'>
+            <Label className='text-xs'>{t('settings.anytext2Url')}</Label>
+            <Input
+              value={pipeline.anytext2_url ?? 'http://127.0.0.1:7863'}
+              onChange={(e) => onChange({ ...pipeline, anytext2_url: e.target.value || null })}
+              placeholder='http://127.0.0.1:7863'
             />
           </div>
         )}

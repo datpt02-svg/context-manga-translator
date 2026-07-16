@@ -431,6 +431,8 @@
     "translator": "Translator",
     "inpainter": "Inpainter",
     "renderer": "Renderer",
+    "anytext2": "AnyText2 Diffusion Renderer",
+    "anytext2Url": "AnyText2 Service URL",
     "unlimitedOcrMode": "Unlimited-OCR Mode",
     "unlimitedOcrUrl": "Unlimited-OCR Service URL",
     "detectorConfidenceThreshold": "Detector Confidence Threshold",

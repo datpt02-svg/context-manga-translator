@@ -38,4 +38,5 @@ export interface PipelineConfigPatch {
   unlimitedOcrMode?: null | UnlimitedOcrMode;
   /** @nullable */
   unlimitedOcrUrl?: string | null;
+  anytext2Url?: string;
 }
