@@ -124,6 +124,9 @@ async fn start_pipeline(
         .unlimited_ocr_url
         .or_else(|| pipeline_config.unlimited_ocr_url.clone());
 
+    // AnyText2 URL: saved config → default.
+    let anytext2_url = pipeline_config.anytext2_url.clone();
+
     let spec = PipelineSpec {
         scope: match req.pages {
             Some(pages) => Scope::Pages(pages),
@@ -139,6 +142,7 @@ async fn start_pipeline(
             reading_order: req.reading_order,
             unlimited_ocr_mode,
             unlimited_ocr_url,
+            anytext2_url,
             detector_confidence_threshold,
             segmenter_binary_threshold,
             comic_text_bubble_detector_classes,
@@ -191,6 +195,7 @@ async fn start_pipeline(
             current_step_index: tick.step_index,
             total_steps: tick.total_steps,
             overall_percent: tick.overall_percent,
+            detail: tick.detail,
         }));
     });
     let warning_bus = app.bus.clone();

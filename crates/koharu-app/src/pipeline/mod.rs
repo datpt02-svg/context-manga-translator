@@ -12,6 +12,7 @@ pub mod ocr_quality;
 pub mod translation_context;
 pub mod unlimited_ocr_client;
 pub mod unlimited_ocr_fallback;
+pub mod anytext2_client;
 
 pub use artifacts::Artifact;
 pub use engine::{
@@ -51,6 +52,10 @@ pub struct ProgressTick {
     pub page_index: usize,
     pub total_pages: usize,
     pub overall_percent: u8,
+    /// Human-readable sub-step detail (e.g. "12/30 text boxes OCR'd").
+    /// Set by the engine on intermediate ticks, `None` on driver-emitted
+    /// ticks.
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -175,6 +180,7 @@ pub async fn run(
                     page_index,
                     total_pages,
                     overall_percent: percent,
+                    detail: None,
                 });
             }
 
@@ -215,6 +221,23 @@ pub async fn run(
                 options: &spec.options,
                 llm: &llm,
                 renderer: &renderer,
+                progress: progress.as_ref().map(|s| {
+                    let s = s.clone();
+                    let offset = completed as usize;
+                    let total = total_units as usize;
+                    let pi = page_index;
+                    Arc::new(move |tick: ProgressTick| {
+                        // Re-base overall_percent from engine's sub-step to
+                        // the full pipeline progress.
+                        let mut t = tick.clone();
+                        t.overall_percent = (((offset + tick.step_index) * 100) / total).min(100) as u8;
+                        t.step_index = seq;
+                        t.total_steps = total_steps;
+                        t.page_index = pi;
+                        t.total_pages = total_pages;
+                        s(t);
+                    }) as ProgressSink
+                }),
             };
             let step_result = async { engine.run(ctx).await }
                 .instrument(tracing::info_span!("step", engine = info.id, page = %page_id))
@@ -309,6 +332,7 @@ pub async fn run(
             page_index: total_pages.saturating_sub(1),
             total_pages,
             overall_percent: 100,
+            detail: None,
         });
     }
     Ok(RunOutcome { warning_count })

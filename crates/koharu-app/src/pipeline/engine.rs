@@ -31,6 +31,7 @@ use tracing::Instrument;
 use crate::blobs::BlobStore;
 use crate::llm;
 use crate::pipeline::artifacts::Artifact;
+use crate::pipeline::ProgressSink;
 use crate::renderer;
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,10 @@ pub struct EngineCtx<'a> {
     pub options: &'a PipelineRunOptions,
     pub llm: &'a llm::Model,
     pub renderer: &'a renderer::Renderer,
+    /// Optional sink for intermediate progress ticks. Engines that perform
+    /// many small sub-tasks (e.g. OCR crops) can call this to report
+    /// granular progress within their step.
+    pub progress: Option<ProgressSink>,
 }
 
 /// Options threaded through a pipeline run.
@@ -68,6 +73,8 @@ pub struct PipelineRunOptions {
     pub unlimited_ocr_mode: UnlimitedOcrMode,
     /// Base URL of the Unlimited-OCR Python service.
     pub unlimited_ocr_url: Option<String>,
+    /// Base URL of the AnyText2 Python render service.
+    pub anytext2_url: Option<String>,
     /// Confidence threshold override for the active detector engine.
     /// `None` = use that engine's built-in default.
     pub detector_confidence_threshold: Option<f32>,
@@ -102,6 +109,7 @@ impl Default for PipelineRunOptions {
             reading_order: None,
             unlimited_ocr_mode: UnlimitedOcrMode::Off,
             unlimited_ocr_url: None,
+            anytext2_url: None,
             detector_confidence_threshold: None,
             segmenter_binary_threshold: None,
             comic_text_bubble_detector_classes: vec![

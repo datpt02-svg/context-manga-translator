@@ -208,7 +208,7 @@ async fn run() -> Result<()> {
     // hangs and you want to see which one.
     let progress_sink: koharu_app::pipeline::ProgressSink =
         Arc::new(|tick: koharu_app::pipeline::ProgressTick| {
-            let line = serde_json::json!({
+            let mut obj = serde_json::json!({
                 "step_id": tick.step_id,
                 "step_index": tick.step_index,
                 "total_steps": tick.total_steps,
@@ -216,7 +216,10 @@ async fn run() -> Result<()> {
                 "total_pages": tick.total_pages,
                 "percent": tick.overall_percent,
             });
-            println!("{line}");
+            if let Some(detail) = &tick.detail {
+                obj["detail"] = serde_json::json!(detail);
+            }
+            println!("{obj}");
         });
 
     let pipeline_config = app.config.load().pipeline.clone();
@@ -232,6 +235,7 @@ async fn run() -> Result<()> {
             region: None,
             unlimited_ocr_mode: Default::default(),
             unlimited_ocr_url: None,
+            anytext2_url: None,
             detector_confidence_threshold: None,
             segmenter_binary_threshold: pipeline_config.segmenter_binary_threshold,
             comic_text_bubble_detector_classes: pipeline_config.comic_text_bubble_detector_classes,

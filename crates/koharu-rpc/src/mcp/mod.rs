@@ -195,6 +195,7 @@ impl KoharuServer {
                 region: None,
                 unlimited_ocr_mode: Default::default(),
                 unlimited_ocr_url: None,
+                anytext2_url: None,
                 detector_confidence_threshold: None,
                 segmenter_binary_threshold: pipeline_config.segmenter_binary_threshold,
                 comic_text_bubble_detector_classes: pipeline_config

@@ -85,6 +85,8 @@ pub struct PipelineConfig {
     pub unlimited_ocr_mode: UnlimitedOcrMode,
     #[serde(default)]
     pub unlimited_ocr_url: Option<String>,
+    #[serde(default)]
+    pub anytext2_url: Option<String>,
     /// Confidence threshold override (0.0..=1.0) for the currently selected
     /// `detector` engine. `None` = use that engine's built-in default.
     #[serde(default)]
@@ -120,6 +122,7 @@ impl Default for PipelineConfig {
             renderer: "koharu-renderer".to_string(),
             unlimited_ocr_mode: UnlimitedOcrMode::Off,
             unlimited_ocr_url: None,
+            anytext2_url: None,
             detector_confidence_threshold: None,
             segmenter_binary_threshold: None,
             comic_text_bubble_detector_classes: default_comic_text_bubble_detector_classes(),
@@ -278,6 +281,9 @@ pub fn apply_patch(config: &mut AppConfig, patch: koharu_core::ConfigPatch) {
         }
         if let Some(v) = p.unlimited_ocr_url {
             config.pipeline.unlimited_ocr_url = v;
+        }
+        if let Some(v) = p.anytext2_url {
+            config.pipeline.anytext2_url = v;
         }
         if let Some(v) = p.detector_confidence_threshold {
             config.pipeline.detector_confidence_threshold = v.map(|x| x.clamp(0.0, 1.0));

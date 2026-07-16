@@ -250,6 +250,8 @@ pub struct PipelineConfigPatch {
     pub unlimited_ocr_mode: Option<UnlimitedOcrMode>,
     #[serde(default)]
     pub unlimited_ocr_url: Option<Option<String>>,
+    #[serde(default)]
+    pub anytext2_url: Option<Option<String>>,
     /// `Some(Some(x))` sets an override, `Some(None)` clears it back to the
     /// detector's built-in default, `None` leaves the existing value as-is.
     #[serde(default, deserialize_with = "deserialize_double_option")]

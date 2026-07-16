@@ -34,4 +34,5 @@ export interface PipelineConfig {
   unlimited_ocr_mode?: UnlimitedOcrMode;
   /** @nullable */
   unlimited_ocr_url?: string | null;
+  anytext2_url?: string;
 }
