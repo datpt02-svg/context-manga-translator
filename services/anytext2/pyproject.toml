@@ -27,6 +27,7 @@ dependencies = [
     "datasets>=3.0.0",
     "diffusers>=0.30.0",
     "pytorch-lightning==2.0.7",
+    "setuptools>=68.0.0",
 ]
 
 [tool.uv.sources]
