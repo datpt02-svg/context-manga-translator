@@ -75,7 +75,16 @@ def load_model() -> None:
         _orig_enc = em.encode_text
 
         def _patched_enc(self_, text_info):
-            n_lines = text_info.get('n_lines', [1])
+            if self_.font_hint_mimic_imgs is None:
+                self_.font_hint_mimic_imgs = []
+            n = max(1, len(text_info.get("n_lines", [1])))
+            while len(self_.font_hint_mimic_imgs) < n:
+                self_.font_hint_mimic_imgs.append([])
+            for i in range(n):
+                want = text_info["n_lines"][i] if i < len(text_info["n_lines"]) else 1
+                while len(self_.font_hint_mimic_imgs[i]) < want:
+                    self_.font_hint_mimic_imgs[i].append(None)
+            return _orig_enc(text_info)
             if not self_.font_hint_mimic_imgs:
                 self_.font_hint_mimic_imgs = [[None] * n for n in n_lines]
             return _orig_enc(text_info)
