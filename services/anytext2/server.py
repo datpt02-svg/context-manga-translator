@@ -85,9 +85,6 @@ def load_model() -> None:
                 while len(self_.font_hint_mimic_imgs[i]) < want:
                     self_.font_hint_mimic_imgs[i].append(None)
             return _orig_enc(text_info)
-            if not self_.font_hint_mimic_imgs:
-                self_.font_hint_mimic_imgs = [[None] * n for n in n_lines]
-            return _orig_enc(text_info)
 
         em.encode_text = _patched_enc.__get__(em, type(em))
         _model_loaded = True
