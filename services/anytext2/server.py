@@ -78,7 +78,7 @@ def load_model() -> None:
             n_lines = text_info.get('n_lines', [1])
             if not self_.font_hint_mimic_imgs:
                 self_.font_hint_mimic_imgs = [[None] * n for n in n_lines]
-            return _orig_enc(self_, text_info)
+            return _orig_enc(text_info)
 
         em.encode_text = _patched_enc.__get__(em, type(em))
         _model_loaded = True
