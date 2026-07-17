@@ -74,11 +74,11 @@ def load_model() -> None:
         em = _inference.model.embedding_manager
         _orig_enc = em.encode_text
 
-        def _patched_enc(text_info):
+        def _patched_enc(self_, text_info):
             n_lines = text_info.get('n_lines', [1])
-            if not em.font_hint_mimic_imgs:
-                em.font_hint_mimic_imgs = [[None] * n for n in n_lines]
-            return _orig_enc(text_info)
+            if not self_.font_hint_mimic_imgs:
+                self_.font_hint_mimic_imgs = [[None] * n for n in n_lines]
+            return _orig_enc(self_, text_info)
 
         em.encode_text = _patched_enc.__get__(em, type(em))
         _model_loaded = True
