@@ -177,6 +177,8 @@ def _render_block(
     }
 
     params = {
+    # The source crop as font_hint gives AnyText2 the original font style to mimic.
+    # The mask tells it which pixels to focus on.
         "mode": "edit",
         "image_count": 1,
         "ddim_steps": 10,
@@ -185,7 +187,8 @@ def _render_block(
         "strength": 1.0,
         "cfg_scale": 7.5,
         "text_colors": f"{text_color[0]},{text_color[1]},{text_color[2]}",
-        "font_hint_image": [np.ones((h, w, 3), dtype=np.uint8) * 255],
+        "font_hint_image": [source_crop],
+        "font_hint_mask": [mask_crop],
     }
 
     results, code, warning_msg, _ = _inference(input_data, **params)
@@ -210,13 +213,10 @@ async def render(req: RenderRequest) -> RenderResponse:
 
         try:
             source_crop = _decode_base64(block.sourceCropBase64)
-            mask_crop = _decode_mask_base64(block.maskCropBase64) if block.maskCropBase64 else None
+            mask_crop = _decode_mask_base64(block.maskCropBase64)
         except ValueError as exc:
             warnings.append(f"Block {block.id}: decode error — {exc}")
             continue
-
-        if mask_crop is None:
-            mask_crop = np.full((source_crop.shape[0], source_crop.shape[1]), 255, dtype=np.uint8)
 
         if source_crop.shape[:2] != mask_crop.shape[:2]:
             mask_crop = cv2.resize(mask_crop, (source_crop.shape[1], source_crop.shape[0]),
@@ -259,4 +259,3 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", "7863"))
     uvicorn.run(app, host="127.0.0.1", port=port)
-
