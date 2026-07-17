@@ -177,8 +177,6 @@ def _render_block(
     }
 
     params = {
-    # The source crop as font_hint gives AnyText2 the original font style to mimic.
-    # The mask tells it which pixels to focus on.
         "mode": "edit",
         "image_count": 1,
         "ddim_steps": 10,
@@ -187,8 +185,8 @@ def _render_block(
         "strength": 1.0,
         "cfg_scale": 7.5,
         "text_colors": f"{text_color[0]},{text_color[1]},{text_color[2]}",
-        "font_hint_image": [source_crop],
-        "font_hint_mask": [mask_crop],
+        "font_hint_image": [],
+        "font_hint_mask": [],
     }
 
     results, code, warning_msg, _ = _inference(input_data, **params)
