@@ -213,11 +213,13 @@ async def render(req: RenderRequest) -> RenderResponse:
 
         try:
             source_crop = _decode_base64(block.sourceCropBase64)
-            mask_crop = _decode_mask_base64(block.maskCropBase64)
+            mask_crop = _decode_mask_base64(block.maskCropBase64) if block.maskCropBase64 else None
         except ValueError as exc:
             warnings.append(f"Block {block.id}: decode error — {exc}")
             continue
 
+        if mask_crop is None:
+            mask_crop = np.full((source_crop.shape[0], source_crop.shape[1]), 255, dtype=np.uint8)
         if source_crop.shape[:2] != mask_crop.shape[:2]:
             mask_crop = cv2.resize(mask_crop, (source_crop.shape[1], source_crop.shape[0]),
                                    interpolation=cv2.INTER_NEAREST)
