@@ -189,6 +189,7 @@ inventory::submit! {
         id: "anytext2",
         name: "AnyText2 Diffusion Renderer",
         needs: &[
+            Artifact::SegmentMask,
             Artifact::TextBoxes,
             Artifact::Translations,
             Artifact::FontPredictions,
