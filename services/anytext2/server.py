@@ -185,7 +185,7 @@ def _render_block(
         "strength": 1.0,
         "cfg_scale": 7.5,
         "text_colors": f"{text_color[0]},{text_color[1]},{text_color[2]}",
-        "font_hint_image": [None],
+        "font_hint_image": [np.ones((h, w, 3), dtype=np.uint8) * 255],
     }
 
     results, code, warning_msg, _ = _inference(input_data, **params)
