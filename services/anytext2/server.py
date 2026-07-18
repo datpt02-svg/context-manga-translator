@@ -120,21 +120,36 @@ def _encode_base64(img: np.ndarray) -> str:
     return base64.b64encode(buf.tobytes()).decode("utf-8")
 
 
+def _draw_pos(source_crop: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Compute draw_pos matching the demo: invert source + overlay mask.
+
+    Demo code (line 143-146):
+        pos_imgs = 255 - edit_image           # invert entire image → bright
+        edit_mask = resize(layer_alpha, (w,h)) # brush stroke alpha
+        pos_imgs = pos_imgs + edit_mask         # white only where brush + inv bg
+        pos_imgs = pos_imgs.clip(0, 255)
+    """
+    h, w = source_crop.shape[:2]
+    inverted = (255 - source_crop).clip(0, 255).astype(np.uint8)
+    if mask.ndim == 2:
+        mask = mask[..., None].repeat(3, axis=-1)
+    draw = (inverted.astype(np.int32) + mask.astype(np.int32)).clip(0, 255).astype(np.uint8)
+    return draw
+
+
 def _inpaint(mask_crop: np.ndarray, source_crop: np.ndarray) -> np.ndarray:
     """Inpaint (remove) text in the mask region, leaving background intact."""
     global _inference
     h, w = source_crop.shape[:2]
-    draw_pos = mask_crop
-    if draw_pos.ndim == 2:
-        draw_pos = np.stack([draw_pos] * 3, axis=-1)
+    draw_pos = _draw_pos(source_crop, mask_crop)
     input_data = {
         "img_prompt": "", "text_prompt": '" "', "seed": 42,
         "draw_pos": draw_pos, "ori_image": source_crop,
     }
     params = {
         "mode": "edit", "image_count": 1, "ddim_steps": 8,
-        "image_width": w, "image_height": h, "strength": 0.6,
-        "cfg_scale": 7.0,
+        "image_width": w, "image_height": h, "strength": 0.5,
+        "cfg_scale": 7.0, "a_prompt": "background, unchanged, same as original",
         "font_hint_image": [], "font_hint_mask": [],
     }
     results, code, warning_msg, _ = _inference(input_data, **params)
@@ -148,14 +163,8 @@ def _render_block(source_crop: np.ndarray, mask_crop: np.ndarray,
     """Two-step: inpaint old text, then render new translation on clean bg."""
     global _inference
     h, w = source_crop.shape[:2]
-
-    # Step 1: inpaint — remove old text from mask region
     inpainted = _inpaint(mask_crop, source_crop)
-
-    # Step 2: render — draw new text on the cleaned area
-    draw_pos = mask_crop
-    if draw_pos.ndim == 2:
-        draw_pos = np.stack([draw_pos] * 3, axis=-1)
+    draw_pos = _draw_pos(inpainted, mask_crop)
     input_data = {
         "img_prompt": "", "text_prompt": f'"{translation}"', "seed": 42,
         "draw_pos": draw_pos, "ori_image": inpainted,
