@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AnyText2 Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui; background: #1a1a1a; color: #eee; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    h1 { font-size: 18px; }
+    #container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+    .panel { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+    .panel label { font-size: 13px; color: #aaa; }
+    canvas { border: 2px solid #555; border-radius: 8px; cursor: crosshair; max-width: 90vw; }
+    #controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+    input, textarea { padding: 8px 12px; border-radius: 6px; border: 1px solid #555; background: #333; color: #eee; font-size: 14px; min-width: 200px; }
+    button { padding: 8px 24px; border: none; border-radius: 6px; background: #0ea5e9; color: #fff; font-size: 14px; cursor: pointer; }
+    button:disabled { opacity: 0.5; }
+    #status { font-size: 13px; color: #888; min-height: 20px; }
+    #result-img { max-width: 90vw; border-radius: 8px; border: 2px solid #555; display: none; }
+    .url-bar { display: flex; gap: 8px; width: 100%; max-width: 400px; }
+    .url-bar input { flex: 1; min-width: 0; }
+    textarea { font-family: monospace; }
+    .hl { color: #0ea5e9; }
+  </style>
+</head>
+<body>
+  <h1>🧪 AnyText2 Test</h1>
+
+  <div class="url-bar">
+    <input id="server-url" value="http://127.0.0.1:7863" placeholder="Server URL">
+    <button onclick="checkHealth()">Health</button>
+  </div>
+
+  <div id="status">Load an image, draw a mask over text, type replacement text, click Render.</div>
+
+  <div id="controls">
+    <input type="file" accept="image/*" id="file-input">
+    <input type="color" id="color-picker" value="#ffffff">
+    <input type="range" id="brush-size" min="4" max="60" value="20" title="Brush size">
+    <span id="brush-label">20px</span>
+    <button onclick="clearMask()">🗑️ Clear Mask</button>
+  </div>
+
+  <div id="container">
+    <div class="panel">
+      <label>① Draw mask (brush) over text</label>
+      <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+    <div class="panel">
+      <label>② Enter translation</label>
+      <textarea id="translation" rows="3" placeholder="Enter translated text..." style="width:280px"></textarea>
+      <button id="render-btn" onclick="render()">✏️ Render Text</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label>③ Result</label>
+    <img id="result-img">
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const resultImg = document.getElementById('result-img');
+    const serverUrl = document.getElementById('server-url');
+    const fileInput = document.getElementById('file-input');
+    const brushSize = document.getElementById('brush-size');
+    const brushLabel = document.getElementById('brush-label');
+    const colorPicker = document.getElementById('color-picker');
+    const translation = document.getElementById('translation');
+
+    let imgData = null;      // original ImageData
+    let maskData = null;     // RGBA mask canvas (white = text region)
+    let isDrawing = false;
+
+    // ---- Init mask canvas ----
+    const maskCanvas = document.createElement('canvas');
+    const maskCtx = maskCanvas.getContext('2d');
+
+    function resizeCanvas(w, h) {
+      canvas.width = w;
+      canvas.height = h;
+      maskCanvas.width = w;
+      maskCanvas.height = h;
+      maskCtx.fillStyle = '#000';
+      maskCtx.fillRect(0, 0, w, h);
+      maskData = maskCtx.getImageData(0, 0, w, h);
+      redraw();
+    }
+
+    // ---- Load image ----
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const MAX = 1200;
+        if (w > MAX || h > MAX) {
+          const scale = MAX / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        resizeCanvas(w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        imgData = ctx.getImageData(0, 0, w, h);
+        setStatus(`Loaded ${img.naturalWidth}×${img.naturalHeight} → ${w}×${h}`);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+
+    // ---- Brush drawing ----
+    brushSize.addEventListener('input', () => {
+      brushLabel.textContent = brushSize.value + 'px';
+    });
+
+    canvas.addEventListener('pointerdown', e => { isDrawing = true; draw(e); });
+    canvas.addEventListener('pointermove', e => { if (isDrawing) draw(e); });
+    canvas.addEventListener('pointerup', () => { isDrawing = false; });
+    canvas.addEventListener('pointerleave', () => { isDrawing = false; });
+
+    function draw(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = Math.round((e.clientX - rect.left) * scaleX);
+      const y = Math.round((e.clientY - rect.top) * scaleY);
+      const r = parseInt(brushSize.value) / 2;
+
+      // Draw on mask
+      maskCtx.fillStyle = '#fff';
+      maskCtx.beginPath();
+      maskCtx.arc(x, y, r, 0, Math.PI * 2);
+      maskCtx.fill();
+
+      maskData = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
+      redraw();
+    }
+
+    function clearMask() {
+      maskCtx.fillStyle = '#000';
+      maskCtx.fillRect(0, 0, canvas.width, canvas.height);
+      maskData = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
+      redraw();
+    }
+
+    function redraw() {
+      if (!imgData) return;
+      ctx.putImageData(imgData, 0, 0);
+      // Overlay mask as semi-transparent red
+      const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const md = maskData.data;
+      for (let i = 0; i < md.length; i += 4) {
+        if (md[i] > 0) {  // white pixel in mask
+          d.data[i]     = Math.round(d.data[i] * 0.5 + 255 * 0.5);
+          d.data[i + 1] = Math.round(d.data[i+1] * 0.5);
+          d.data[i + 2] = Math.round(d.data[i+2] * 0.5);
+          d.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(d, 0, 0);
+    }
+
+    // ---- Health check ----
+    async function checkHealth() {
+      setStatus('Checking health...');
+      try {
+        const r = await fetch(serverUrl.value + '/health');
+        const j = await r.json();
+        setStatus(`✅ Health OK — model_loaded: ${j.model_loaded}, device: ${j.device}`);
+      } catch (e) {
+        setStatus(`❌ Health FAIL: ${e.message}`);
+      }
+    }
+
+    // ---- Render ----
+    async function render() {
+      const text = translation.value.trim();
+      if (!text) { setStatus('⚠️ Enter translation text'); return; }
+      if (!imgData) { setStatus('⚠️ Load an image first'); return; }
+      const btn = document.getElementById('render-btn');
+      btn.disabled = true;
+      setStatus('🔄 Rendering...');
+
+      try {
+        // 1. Source image as base64 PNG
+        const srcCanvas = document.createElement('canvas');
+        srcCanvas.width = canvas.width;
+        srcCanvas.height = canvas.height;
+        srcCanvas.getContext('2d').putImageData(imgData, 0, 0);
+        const sourceB64 = srcCanvas.toDataURL('image/png').split(',')[1];
+
+        // 2. Mask crop — find bounding box of mask
+        const md = maskData.data;
+        let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+        let hasMask = false;
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const i = (y * canvas.width + x) * 4;
+            if (md[i] > 0) {
+              hasMask = true;
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (!hasMask) { setStatus('⚠️ Draw a mask first (brush over text)'); btn.disabled = false; return; }
+
+        const pad = 16;
+        const bx = Math.max(0, minX - pad);
+        const by = Math.max(0, minY - pad);
+        const bw = Math.min(canvas.width - bx, maxX - minX + pad * 2);
+        const bh = Math.min(canvas.height - by, maxY - minY + pad * 2);
+
+        // 3. Crop source + mask → base64
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = bw;
+        cropCanvas.height = bh;
+        const cropCtx = cropCanvas.getContext('2d');
+        cropCtx.drawImage(srcCanvas, bx, by, bw, bh, 0, 0, bw, bh);
+        const sourceCropB64 = cropCanvas.toDataURL('image/png').split(',')[1];
+
+        const maskCropCanvas = document.createElement('canvas');
+        maskCropCanvas.width = bw;
+        maskCropCanvas.height = bh;
+        maskCropCanvas.getContext('2d').drawImage(maskCanvas, bx, by, bw, bh, 0, 0, bw, bh);
+        const maskCropB64 = maskCropCanvas.toDataURL('image/png').split(',')[1];
+
+        // 4. Call AnyText2
+        const resp = await fetch(serverUrl.value + '/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageWidth: canvas.width,
+            imageHeight: canvas.height,
+            sourceImageBase64: sourceB64,
+            blocks: [{
+              id: 'block1',
+              translation: text,
+              x: bx, y: by, width: bw, height: bh,
+              sourceCropBase64: sourceCropB64,
+              maskCropBase64: maskCropB64,
+              textColor: [0, 0, 0, 255],
+              fontHint: { serif: false, language: 'ja', family: null, fontSizePx: null }
+            }]
+          })
+        });
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${err.slice(0, 200)}`);
+        }
+        const data = await resp.json();
+
+        // 5. Composite result back
+        if (!data.blocks || !data.blocks[0]) throw new Error('No blocks returned');
+        const renderedB64 = data.blocks[0].renderedCropBase64;
+
+        // Show result
+        resultImg.src = 'data:image/png;base64,' + renderedB64;
+        resultImg.style.display = 'block';
+
+        setStatus(`✅ Done! Warnings: ${data.warnings?.length || 0}`);
+      } catch (e) {
+        setStatus(`❌ Error: ${e.message}`);
+      }
+      btn.disabled = false;
+    }
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+  </script>
+</body>
+</html>
