@@ -130,6 +130,8 @@ def _draw_pos(source_crop: np.ndarray, mask: np.ndarray) -> np.ndarray:
         pos_imgs = pos_imgs.clip(0, 255)
     """
     h, w = source_crop.shape[:2]
+    if mask.shape[:2] != (h, w):
+        mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
     inverted = (255 - source_crop).clip(0, 255).astype(np.uint8)
     if mask.ndim == 2:
         mask = mask[..., None].repeat(3, axis=-1)
