@@ -120,28 +120,57 @@ def _encode_base64(img: np.ndarray) -> str:
     return base64.b64encode(buf.tobytes()).decode("utf-8")
 
 
-def _render_block(source_crop: np.ndarray, mask_crop: np.ndarray,
-                  translation: str, text_color: list[int]) -> np.ndarray:
+def _inpaint(mask_crop: np.ndarray, source_crop: np.ndarray) -> np.ndarray:
+    """Inpaint (remove) text in the mask region, leaving background intact."""
     global _inference
     h, w = source_crop.shape[:2]
     draw_pos = mask_crop
     if draw_pos.ndim == 2:
         draw_pos = np.stack([draw_pos] * 3, axis=-1)
     input_data = {
-        "img_prompt": "", "text_prompt": f'"{translation}"', "seed": 42,
+        "img_prompt": "", "text_prompt": '" "', "seed": 42,
         "draw_pos": draw_pos, "ori_image": source_crop,
     }
     params = {
+        "mode": "edit", "image_count": 1, "ddim_steps": 8,
+        "image_width": w, "image_height": h, "strength": 0.6,
+        "cfg_scale": 7.0,
+        "font_hint_image": [], "font_hint_mask": [],
+    }
+    results, code, warning_msg, _ = _inference(input_data, **params)
+    if code != 0:
+        print(f"[anytext2] Inpaint warning: {warning_msg}")
+    return results[0] if results and len(results) > 0 else source_crop
+
+
+def _render_block(source_crop: np.ndarray, mask_crop: np.ndarray,
+                  translation: str, text_color: list[int]) -> np.ndarray:
+    """Two-step: inpaint old text, then render new translation on clean bg."""
+    global _inference
+    h, w = source_crop.shape[:2]
+
+    # Step 1: inpaint — remove old text from mask region
+    inpainted = _inpaint(mask_crop, source_crop)
+
+    # Step 2: render — draw new text on the cleaned area
+    draw_pos = mask_crop
+    if draw_pos.ndim == 2:
+        draw_pos = np.stack([draw_pos] * 3, axis=-1)
+    input_data = {
+        "img_prompt": "", "text_prompt": f'"{translation}"', "seed": 42,
+        "draw_pos": draw_pos, "ori_image": inpainted,
+    }
+    params = {
         "mode": "edit", "image_count": 1, "ddim_steps": 10,
-        "image_width": w, "image_height": h, "strength": 0.4,
+        "image_width": w, "image_height": h, "strength": 0.5,
         "cfg_scale": 7.5,
         "text_colors": f"{text_color[0]},{text_color[1]},{text_color[2]}",
         "font_hint_image": [], "font_hint_mask": [],
     }
     results, code, warning_msg, _ = _inference(input_data, **params)
     if code != 0:
-        print(f"[anytext2] Warning: {warning_msg}")
-    return results[0] if results and len(results) > 0 else source_crop
+        print(f"[anytext2] Render warning: {warning_msg}")
+    return results[0] if results and len(results) > 0 else inpainted
 
 
 @app.on_event("startup")
