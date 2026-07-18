@@ -124,7 +124,7 @@ def _render_block(source_crop: np.ndarray, mask_crop: np.ndarray,
                   translation: str, text_color: list[int]) -> np.ndarray:
     global _inference
     h, w = source_crop.shape[:2]
-    draw_pos = 255 - mask_crop
+    draw_pos = mask_crop
     if draw_pos.ndim == 2:
         draw_pos = np.stack([draw_pos] * 3, axis=-1)
     input_data = {
@@ -133,7 +133,7 @@ def _render_block(source_crop: np.ndarray, mask_crop: np.ndarray,
     }
     params = {
         "mode": "edit", "image_count": 1, "ddim_steps": 10,
-        "image_width": w, "image_height": h, "strength": 1.0,
+        "image_width": w, "image_height": h, "strength": 0.4,
         "cfg_scale": 7.5,
         "text_colors": f"{text_color[0]},{text_color[1]},{text_color[2]}",
         "font_hint_image": [], "font_hint_mask": [],
@@ -174,7 +174,7 @@ async def render(req: RenderRequest) -> RenderResponse:
             continue
 
         if mask_crop is None:
-            mask_crop = np.full((source_crop.shape[0], source_crop.shape[1]), 255, dtype=np.uint8)
+            mask_crop = np.zeros((source_crop.shape[0], source_crop.shape[1]), dtype=np.uint8)
         elif source_crop.shape[:2] != mask_crop.shape[:2]:
             mask_crop = cv2.resize(mask_crop, (source_crop.shape[1], source_crop.shape[0]),
                                    interpolation=cv2.INTER_NEAREST)
