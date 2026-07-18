@@ -31,6 +31,7 @@ if _anytext2_repo and os.path.isdir(_anytext2_repo):
     sys.path.insert(0, _anytext2_repo)
     print(f"[anytext2] using repo at {_anytext2_repo}")
 
+from fastapi.middleware.cors import CORSMiddleware
 from schemas import HealthResponse, RenderRequest, RenderResponse, RenderedBlock
 
 app = FastAPI(title="AnyText2 Renderer", version="0.1.0")
