@@ -50,7 +50,8 @@ for c in [FONT_PATH, "C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/Arial.ttf",
 if not FONT_PATH or not os.path.isfile(FONT_PATH):
     print("[anytext2] WARNING: no TrueType font found; set ANYTEXT2_FONT_PATH")
     FONT_PATH = "font/Arial_Unicode.ttf"
-MODEL_PATH = os.environ.get("ANYTEXT2_MODEL_PATH", "models/anytext_v2.0.ckpt")
+MODEL_PATH = (os.environ.get("ANYTEXT2_MODEL_PATH") or
+             os.path.join(MODEL_DIR, "anytext_v2.0.ckpt"))
 DEVICE = os.environ.get("ANYTEXT2_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 USE_FP16 = os.environ.get("ANYTEXT2_FP16", "0") == "1"
 
