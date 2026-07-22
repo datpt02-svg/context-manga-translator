@@ -59,10 +59,32 @@ _inference: object | None = None
 _model_loaded = False
 
 
+def _ensure_models() -> None:
+    """Auto-download checkpoint + CLIP from ModelScope if missing."""
+    ckpt = os.path.join(MODEL_DIR, "anytext_v2.0.ckpt")
+    clip_dir = os.path.join(MODEL_DIR, "clip-vit-large-patch14")
+    if os.path.isfile(ckpt) and os.path.isdir(clip_dir):
+        return
+    print("[anytext2] Models missing, downloading from ModelScope…")
+    try:
+        from modelscope import snapshot_download
+    except ImportError:
+        sys.exit("Install modelscope first: pip install modelscope")
+    import shutil
+    src = snapshot_download("iic/cv_anytext2")
+    if not os.path.isfile(ckpt):
+        shutil.copy2(os.path.join(src, "anytext_v2.0.ckpt"), ckpt)
+        print(f"[anytext2] Copied checkpoint ({os.path.getsize(ckpt) >> 30} GB)")
+    if not os.path.isdir(clip_dir):
+        shutil.copytree(os.path.join(src, "clip-vit-large-patch14"), clip_dir)
+        print("[anytext2] Copied CLIP model")
+
+
 def load_model() -> None:
     global _inference, _model_loaded
     if _model_loaded:
         return
+    _ensure_models()
     if DEVICE.startswith("cuda") and not torch.cuda.is_available():
         sys.exit("FATAL: CUDA not available.")
     print(f"[anytext2] Loading model on {DEVICE} (fp16={USE_FP16})")
