@@ -7,10 +7,13 @@
 //!
 //! Requires an `Image { role: Inpainted }` node on the page.
 
+use std::collections::HashMap;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use koharu_core::{
-    ImageRole, MaskRole, NodeDataPatch, NodePatch, Op, TextDataPatch, TextStyle, Transform,
+    ImageRole, MaskRole, NodeDataPatch, NodeId, NodeKind, NodePatch, Op, TextDataPatch,
+    TextStyle, Transform,
 };
 use koharu_llm::Language;
 
@@ -94,9 +97,87 @@ impl Engine for Model {
             &page_opts,
         )?;
 
+        // ---- Detect overflow + shorten via LLM ----
+        // When a rendered sprite exceeds its text box, call the LLM to
+        // shorten the translation, patch the scene node, and re-render.
+        let mut shorten_map: HashMap<NodeId, String> = HashMap::new();
+        for block_out in &output.blocks {
+            let Some(input) = inputs.iter().find(|i| i.node_id == block_out.node_id) else {
+                continue;
+            };
+            let sp_w = block_out.sprite.width() as f32;
+            let sp_h = block_out.sprite.height() as f32;
+            if sp_w <= input.transform.width + 2.0 && sp_h <= input.transform.height + 2.0 {
+                continue;
+            }
+            let source_text = find_source_text(ctx.scene, ctx.page, block_out.node_id)
+                .unwrap_or_default();
+            let prompt = serde_json::json!({
+                "sourceText": source_text,
+                "translation": &input.translation,
+                "boxWidth": input.transform.width as u32,
+                "boxHeight": input.transform.height as u32,
+            });
+            let system = "\
+                You are a manga text shortening assistant.\n\
+                Shorten the given translation to fit inside the text box \
+                (width x height in px).\n\
+                Preserve meaning, tone, key names and numbers.\n\
+                Keep it natural — do not just remove words.\n\
+                Return ONLY the shortened text, no markdown, no JSON wrapper.";
+            match ctx
+                .llm
+                .translate_raw(&prompt.to_string(), Some(system), None)
+                .await
+            {
+                Ok(shortened) => {
+                    let s = shortened.trim().to_string();
+                    if !s.is_empty() && s != input.translation {
+                        tracing::info!(
+                            node = %block_out.node_id,
+                            before = %input.translation,
+                            after = %s,
+                            "LLM-shortened overflowed text"
+                        );
+                        shorten_map.insert(block_out.node_id, s);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(node = %block_out.node_id, "shorten LLM failed: {e:#}");
+                }
+            }
+        }
+
+        // If any blocks were shortened, re-render with the new translations.
+        let (sprites, final_render) = if shorten_map.is_empty() {
+            (output.blocks, output.final_render)
+        } else {
+            let mut short_inputs = inputs.clone();
+            for block in &mut short_inputs {
+                if let Some(s) = shorten_map.get(&block.node_id) {
+                    block.translation = s.clone();
+                }
+            }
+            match ctx.renderer.render_page(
+                &base,
+                brush.as_ref(),
+                bubble.as_ref(),
+                w,
+                h,
+                &short_inputs,
+                &page_opts,
+            ) {
+                Ok(short_out) => (short_out.blocks, short_out.final_render),
+                Err(e) => {
+                    tracing::warn!("re-render after shorten failed: {e:#}");
+                    (output.blocks, output.final_render)
+                }
+            }
+        };
+
         // Upload sprites + compose ops.
-        let mut ops = Vec::with_capacity(output.blocks.len() + 1);
-        for block_out in output.blocks {
+        let mut ops = Vec::with_capacity(sprites.len() + 1);
+        for block_out in sprites {
             let sprite_ref = ctx.blobs.put_raw(&block_out.sprite)?;
             let existing_style = inputs
                 .iter()
@@ -127,7 +208,7 @@ impl Engine for Model {
         }
 
         // Final composite → Image { Rendered } upsert.
-        let final_blob = ctx.blobs.put_webp(&output.final_render)?;
+        let final_blob = ctx.blobs.put_webp(&final_render)?;
         ops.push(upsert_image_blob(
             ctx.scene,
             ctx.page,
@@ -168,6 +249,16 @@ fn normalize_transform(t: Transform) -> Transform {
 
 fn preserve_existing_style(existing: Option<TextStyle>) -> Option<Option<TextStyle>> {
     existing.map(Some)
+}
+
+/// Look up the OCR source text for a text node.
+fn find_source_text(scene: &koharu_core::Scene, page: koharu_core::PageId, node_id: NodeId) -> Option<String> {
+    let page_ref = scene.page(page)?;
+    let node = page_ref.nodes.get(&node_id)?;
+    match &node.kind {
+        NodeKind::Text(t) => t.text.clone(),
+        _ => None,
+    }
 }
 
 fn render_target_language_tag(value: &str) -> String {

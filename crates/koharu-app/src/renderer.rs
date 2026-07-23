@@ -561,17 +561,20 @@ fn fit_font_size<'a>(
     let fits =
         |run: &LayoutRun<'a>| run.width <= constraint_width && run.height <= constraint_height;
 
-    let min_size = min_size.max(1.0).round() as i32;
-    let max_size = (max_size.round() as i32).max(min_size);
+    // Absolute floor: never go below 4px, guaranteeing text always fits.
+    const ABSOLUTE_MIN: i32 = 4;
+    let soft_min = min_size.max(1.0).round() as i32;
+    let max_size = (max_size.round() as i32).max(soft_min);
+    let effective_min = ABSOLUTE_MIN.min(soft_min);
 
     let at_max = run_at(max_size as f32)?;
     if fits(&at_max) {
         return Ok(at_max);
     }
-    // Binary-search [min, max) for the largest fitting size.
-    let mut lo = min_size;
+    // Binary-search [effective_min, max) for the largest fitting size.
+    let mut lo = effective_min;
     let mut hi = max_size - 1;
-    let mut best = run_at(min_size as f32)?;
+    let mut best = run_at(effective_min as f32)?;
     if !fits(&best) {
         return Ok(best);
     }
@@ -616,8 +619,10 @@ where
         return Ok(attempt.candidate);
     }
 
-    let min_size = min_size.max(1.0).round() as i32;
-    let max_size = (max_size.max(1.0).round() as i32).max(min_size);
+    const ABSOLUTE_MIN: i32 = 4;
+    let soft_min = min_size.max(1.0).round() as i32;
+    let max_size = (max_size.max(1.0).round() as i32).max(soft_min);
+    let effective_min = ABSOLUTE_MIN.min(soft_min);
 
     if let Some(candidate) = try_mask_collision_size(
         layout_builder,
@@ -635,7 +640,7 @@ where
         layout_builder,
         text,
         layout_box,
-        min_size as f32,
+        effective_min as f32,
         mask,
         bubble_id,
         render_candidate,
@@ -645,8 +650,8 @@ where
     }
     let mut best = min_attempt.candidate;
 
-    let mut lo = min_size + 1;
-    let mut hi = max_size - 1;
+    let mut lo = (min_size.round() as i32 + 1).max(effective_min);
+    let mut hi = (max_size - 1).max(lo);
     while lo <= hi {
         let mid = lo + (hi - lo) / 2;
         if let Some(candidate) = try_mask_collision_size(
@@ -1188,7 +1193,7 @@ mod tests {
             &mut render_candidate,
         )?;
 
-        assert_eq!(rendered_sizes.last().copied(), Some(12.0));
+        assert_eq!(rendered_sizes.last().copied(), Some(4.0));
         assert!(candidate.image.width() >= 1);
         assert!(candidate.image.height() >= 1);
         Ok(())
