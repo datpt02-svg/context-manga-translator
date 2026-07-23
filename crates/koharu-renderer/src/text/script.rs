@@ -166,6 +166,7 @@ pub fn font_families_for_text(text: &str) -> Vec<String> {
         #[cfg(target_os = "windows")]
         {
             &[
+                "Patrick Hand",
                 "Comic Neue",
                 "Bangers",
                 "Comic Sans MS",
@@ -177,6 +178,7 @@ pub fn font_families_for_text(text: &str) -> Vec<String> {
         #[cfg(target_os = "macos")]
         {
             &[
+                "Patrick Hand",
                 "Comic Neue",
                 "Bangers",
                 "Chalkboard SE",
@@ -188,6 +190,7 @@ pub fn font_families_for_text(text: &str) -> Vec<String> {
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
             &[
+                "Patrick Hand",
                 "Comic Neue",
                 "Bangers",
                 "Noto Sans",
