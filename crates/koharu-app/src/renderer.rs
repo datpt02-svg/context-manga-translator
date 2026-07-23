@@ -354,7 +354,7 @@ impl Renderer {
             )?;
             return Ok(Some(RenderedBlock {
                 node_id: block.node_id,
-                sprite: DynamicImage::ImageRgba8(candidate.image),
+                sprite: crop_to_box(DynamicImage::ImageRgba8(candidate.image), layout_box, &candidate.transform),
                 rendered_direction: rendered_direction_for_writing_mode(writing_mode),
                 expanded_transform: Some(candidate.transform),
             }));
@@ -374,7 +374,7 @@ impl Renderer {
 
         Ok(Some(RenderedBlock {
             node_id: block.node_id,
-            sprite: DynamicImage::ImageRgba8(candidate.image),
+            sprite: crop_to_box(DynamicImage::ImageRgba8(candidate.image), layout_box, &candidate.transform),
             rendered_direction: rendered_direction_for_writing_mode(writing_mode),
             expanded_transform: Some(candidate.transform),
         }))
@@ -1016,6 +1016,34 @@ fn rendered_direction_for_writing_mode(writing_mode: WritingMode) -> TextDirecti
         WritingMode::Horizontal => TextDirection::Horizontal,
         WritingMode::VerticalRl => TextDirection::Vertical,
     }
+}
+
+/// Crop sprite to fit inside the layout box so overflow never spills out.
+/// When the rendered sprite extends beyond the box, it's cropped and the
+/// transform width/height are updated to reflect the clipped dimensions.
+fn crop_to_box(sprite: DynamicImage, box_: LayoutBox, transform: &Transform) -> DynamicImage {
+    let bx = box_.x;
+    let by = box_.y;
+    let bw = box_.width.max(1.0);
+    let bh = box_.height.max(1.0);
+
+    // Sprite is placed at (transform.x, transform.y) in page coords.
+    let overlap_x0 = transform.x.max(bx);
+    let overlap_y0 = transform.y.max(by);
+    let overlap_x1 = (transform.x + transform.width).min(bx + bw);
+    let overlap_y1 = (transform.y + transform.height).min(by + bh);
+
+    if overlap_x0 >= overlap_x1 || overlap_y0 >= overlap_y1 {
+        return DynamicImage::ImageRgba8(RgbaImage::new(1, 1));
+    }
+
+    let local_x = (overlap_x0 - transform.x) as u32;
+    let local_y = (overlap_y0 - transform.y) as u32;
+    let crop_w = (overlap_x1 - overlap_x0) as u32;
+    let crop_h = (overlap_y1 - overlap_y0) as u32;
+
+    let cropped = sprite.crop_imm(local_x, local_y, crop_w, crop_h);
+    DynamicImage::ImageRgba8(cropped.to_rgba8())
 }
 
 // ---------------------------------------------------------------------------
