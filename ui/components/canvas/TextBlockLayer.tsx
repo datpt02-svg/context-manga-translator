@@ -7,6 +7,7 @@ import { useHotkeys } from 'react-hotkeys-hook'
 import { useBlobImage } from '@/hooks/useBlobData'
 import { useCurrentPage, useTextNodes, type TextNodeEntry } from '@/hooks/useCurrentPage'
 import type { NodeDataPatch, Transform } from '@/lib/api/schemas'
+import { useEditorUiStore } from '@/lib/stores/editorUiStore'
 import { applyOp, queueAutoRender } from '@/lib/io/scene'
 import { ops } from '@/lib/ops'
 import { useEditorUiStore } from '@/lib/stores/editorUiStore'
@@ -138,6 +139,8 @@ function TextBlockItem({
   const dragStart = useRef({ x: 0, y: 0, w: 0, h: 0 })
   const edgeRef = useRef<ResizeEdge | null>(null)
   const isResizeRef = useRef(false)
+  const showBubbleShapes = useEditorUiStore((s) => s.showBubbleShapes)
+  const contour = showBubbleShapes ? node.data.bubbleContour : undefined
 
   const setBox = (x: number, y: number, w: number, h: number) => {
     const el = boxRef.current
@@ -250,11 +253,18 @@ function TextBlockItem({
       }}
     >
       <div
-        className={`absolute inset-0 rounded-md ${
+        className={`absolute inset-0 ${contour?.length ? '' : 'rounded-md'} ${
           selected
             ? 'border-[3px] border-primary bg-primary/15'
             : 'border-2 border-rose-400/60 bg-rose-400/5'
         }`}
+        style={
+          contour?.length
+            ? {
+                clipPath: `polygon(${contour.map(([x, y]) => `${(x - t.x) * scale}px ${(y - t.y) * scale}px`).join(',')})`,
+              }
+            : undefined
+        }
       />
       <div
         className={`pointer-events-none absolute -top-1.5 -left-1.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold text-white shadow ${

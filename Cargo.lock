@@ -4224,6 +4224,7 @@ dependencies = [
  "fs4",
  "futures",
  "image",
+ "imageproc",
  "inventory",
  "koharu-ai",
  "koharu-core",

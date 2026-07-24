@@ -37,6 +37,7 @@ dashmap = { workspace = true }
 fs4 = { workspace = true }
 futures = { workspace = true }
 image = { workspace = true }
+imageproc = { workspace = true }
 inventory = { workspace = true }
 lru = { workspace = true }
 parking_lot = { workspace = true }

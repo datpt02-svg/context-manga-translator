@@ -19,6 +19,8 @@ export interface TextData {
   /** @nullable */
   linePolygons?: number[][][] | null;
   lockLayoutBox?: boolean;
+  /** @nullable */
+  bubbleContour?: number[][] | null;
   /**
      * OCR score, separate from detector `confidence`.
      * @nullable

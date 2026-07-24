@@ -23,6 +23,10 @@ use crate::pipeline::engines::support::{
     find_image_node, find_mask_node, image_dimensions, load_source_image, text_nodes,
     upsert_image_blob,
 };
+use koharu_renderer::text::latin::{BubbleIndex, LayoutBox};
+use koharu_renderer::text::script::writing_mode_for_block;
+use koharu_renderer::types::RenderBlock;
+
 use crate::renderer::{PageRenderOptions, RenderBlockInput};
 
 pub struct Model;
@@ -174,6 +178,9 @@ impl Engine for Model {
         };
 
         // Upload sprites + compose ops.
+        // Pre-compute bubble contours so each block op can include its outline.
+        let bubble_contours = build_bubble_contour_map(bubble.as_ref(), &nodes);
+
         let mut ops = Vec::with_capacity(sprites.len() + 1);
         for block_out in sprites {
             let sprite_ref = ctx.blobs.put_raw(&block_out.sprite)?;
@@ -183,6 +190,7 @@ impl Engine for Model {
                 .and_then(|i| i.style.clone());
             let shortened_translation =
                 shortened_translation_patch(&shorten_map, block_out.node_id);
+            let contour = bubble_contours.get(&block_out.node_id).cloned();
             ops.push(Op::UpdateNode {
                 page: ctx.page,
                 id: block_out.node_id,
@@ -199,6 +207,7 @@ impl Engine for Model {
                         // explicit black overrides.
                         style: preserve_existing_style(existing_style),
                         translation: shortened_translation,
+                        bubble_contour: Some(contour),
                         ..Default::default()
                     })),
                     transform: None,
@@ -281,6 +290,53 @@ fn render_target_language_tag(value: &str) -> String {
     Language::parse(value)
         .map(|language| language.tag().to_string())
         .unwrap_or_else(|| value.to_string())
+}
+
+fn build_bubble_contour_map(
+    bubble: Option<&image::DynamicImage>,
+    nodes: &[(NodeId, &koharu_core::Transform, &koharu_core::TextData)],
+) -> HashMap<NodeId, Vec<[f32; 2]>> {
+    let Some(bubble_img) = bubble else {
+        return HashMap::new();
+    };
+    let gray = bubble_img.to_luma8();
+    let index = BubbleIndex::new(gray.clone());
+    let mut map = HashMap::new();
+
+    for &(node_id, transform, text_data) in nodes {
+        let render_block = RenderBlock {
+            x: transform.x,
+            y: transform.y,
+            width: transform.width.max(1.0),
+            height: transform.height.max(1.0),
+            text: text_data.translation.as_deref().unwrap_or("a").to_string(),
+            source_direction: text_data.source_direction.map(|d| match d {
+                koharu_core::TextDirection::Horizontal => {
+                    koharu_renderer::types::TextDirection::Horizontal
+                }
+                koharu_core::TextDirection::Vertical => {
+                    koharu_renderer::types::TextDirection::Vertical
+                }
+            }),
+        };
+        let writing_mode = writing_mode_for_block(&render_block);
+        let seed = LayoutBox {
+            x: transform.x,
+            y: transform.y,
+            width: transform.width.max(1.0),
+            height: transform.height.max(1.0),
+        };
+
+        if let Some(matched) = index.lookup_match(seed, writing_mode) {
+            if let Some(contour) =
+                koharu_ml::bubble_contour::extract_contour_from_id_mask(&gray, matched.id)
+            {
+                map.insert(node_id, contour);
+            }
+        }
+    }
+
+    map
 }
 
 #[cfg(test)]

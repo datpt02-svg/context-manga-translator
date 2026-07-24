@@ -40,6 +40,8 @@ export function LayersPanel() {
   const setShowBrushLayer = useEditorUiStore((s) => s.setShowBrushLayer)
   const showTextBlocksOverlay = useEditorUiStore((s) => s.showTextBlocksOverlay)
   const setShowTextBlocksOverlay = useEditorUiStore((s) => s.setShowTextBlocksOverlay)
+  const showBubbleShapes = useEditorUiStore((s) => s.showBubbleShapes)
+  const setShowBubbleShapes = useEditorUiStore((s) => s.setShowBubbleShapes)
   const showRenderedImage = useEditorUiStore((s) => s.showRenderedImage)
   const setShowRenderedImage = useEditorUiStore((s) => s.setShowRenderedImage)
 
@@ -108,6 +110,23 @@ export function LayersPanel() {
       {layers.map((layer) => (
         <LayerItem key={layer.id} layer={layer} />
       ))}
+      {/* Bubble shapes sub-toggle */}
+      {textNodes.length > 0 && (
+        <button
+          onClick={() => setShowBubbleShapes(!showBubbleShapes)}
+          className={cn(
+            'flex items-center gap-2 pl-8 pr-2 py-1 text-xs',
+            showBubbleShapes ? 'text-foreground' : 'text-muted-foreground/50',
+          )}
+        >
+          {showBubbleShapes ? (
+            <EyeIcon className='size-3' />
+          ) : (
+            <EyeOffIcon className='size-3 text-muted-foreground/40' />
+          )}
+          <span>Bubble shapes</span>
+        </button>
+      )}
     </div>
   )
 }

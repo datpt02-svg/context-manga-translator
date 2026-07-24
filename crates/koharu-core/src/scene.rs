@@ -321,6 +321,12 @@ pub struct TextData {
     pub sprite_transform: Option<Transform>,
     #[serde(default)]
     pub lock_layout_box: bool,
+    /// Outer contour polygon of the enclosing speech bubble, in image
+    /// coordinates. Each entry is `[x, y]`. Used by the front-end to render
+    /// a non-rectangular selection outline. Set by the bubble-segmentation
+    /// pipeline engine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bubble_contour: Option<Vec<[f32; 2]>>,
 }
 
 // ---------------------------------------------------------------------------
