@@ -12,8 +12,8 @@ use std::collections::HashMap;
 use anyhow::Result;
 use async_trait::async_trait;
 use koharu_core::{
-    ImageRole, MaskRole, NodeDataPatch, NodeId, NodeKind, NodePatch, Op, TextDataPatch,
-    TextStyle, Transform,
+    ImageRole, MaskRole, NodeDataPatch, NodeId, NodeKind, NodePatch, Op, TextDataPatch, TextStyle,
+    Transform,
 };
 use koharu_llm::Language;
 
@@ -105,13 +105,11 @@ impl Engine for Model {
             let Some(input) = inputs.iter().find(|i| i.node_id == block_out.node_id) else {
                 continue;
             };
-            let sp_w = block_out.sprite.width() as f32;
-            let sp_h = block_out.sprite.height() as f32;
-            if sp_w <= input.transform.width + 2.0 && sp_h <= input.transform.height + 2.0 {
+            if !should_shorten_rendered_block(block_out.fits) {
                 continue;
             }
-            let source_text = find_source_text(ctx.scene, ctx.page, block_out.node_id)
-                .unwrap_or_default();
+            let source_text =
+                find_source_text(ctx.scene, ctx.page, block_out.node_id).unwrap_or_default();
             let prompt = serde_json::json!({
                 "sourceText": source_text,
                 "translation": &input.translation,
@@ -183,6 +181,8 @@ impl Engine for Model {
                 .iter()
                 .find(|i| i.node_id == block_out.node_id)
                 .and_then(|i| i.style.clone());
+            let shortened_translation =
+                shortened_translation_patch(&shorten_map, block_out.node_id);
             ops.push(Op::UpdateNode {
                 page: ctx.page,
                 id: block_out.node_id,
@@ -198,6 +198,7 @@ impl Engine for Model {
                         // later renders treat implicit predicted colors as
                         // explicit black overrides.
                         style: preserve_existing_style(existing_style),
+                        translation: shortened_translation,
                         ..Default::default()
                     })),
                     transform: None,
@@ -251,8 +252,23 @@ fn preserve_existing_style(existing: Option<TextStyle>) -> Option<Option<TextSty
     existing.map(Some)
 }
 
+fn shortened_translation_patch(
+    shorten_map: &HashMap<NodeId, String>,
+    node_id: NodeId,
+) -> Option<Option<String>> {
+    shorten_map.get(&node_id).cloned().map(Some)
+}
+
+fn should_shorten_rendered_block(fits: bool) -> bool {
+    !fits
+}
+
 /// Look up the OCR source text for a text node.
-fn find_source_text(scene: &koharu_core::Scene, page: koharu_core::PageId, node_id: NodeId) -> Option<String> {
+fn find_source_text(
+    scene: &koharu_core::Scene,
+    page: koharu_core::PageId,
+    node_id: NodeId,
+) -> Option<String> {
     let page_ref = scene.page(page)?;
     let node = page_ref.nodes.get(&node_id)?;
     match &node.kind {
@@ -269,8 +285,10 @@ fn render_target_language_tag(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{preserve_existing_style, render_target_language_tag};
-    use koharu_core::TextStyle;
+    use std::collections::HashMap;
+
+    use super::{preserve_existing_style, render_target_language_tag, shortened_translation_patch};
+    use koharu_core::{NodeId, TextStyle};
 
     #[test]
     fn omits_style_patch_when_block_has_no_explicit_style() {
@@ -307,5 +325,28 @@ mod tests {
             render_target_language_tag("not-a-language"),
             "not-a-language"
         );
+    }
+
+    #[test]
+    fn shortened_translation_patch_only_patches_shortened_nodes() {
+        let shortened_id = NodeId::new();
+        let untouched_id = NodeId::new();
+        let mut shorten_map = HashMap::new();
+        shorten_map.insert(shortened_id, "Short text".to_string());
+
+        assert_eq!(
+            shortened_translation_patch(&shorten_map, shortened_id),
+            Some(Some("Short text".to_string()))
+        );
+        assert_eq!(
+            shortened_translation_patch(&shorten_map, untouched_id),
+            None
+        );
+    }
+
+    #[test]
+    fn shorten_trigger_uses_fit_metadata() {
+        assert!(super::should_shorten_rendered_block(false));
+        assert!(!super::should_shorten_rendered_block(true));
     }
 }

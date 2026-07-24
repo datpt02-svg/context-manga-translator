@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Text render contract</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #111827;
+      color: #e5e7eb;
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
+    h1 { margin: 0; font-size: 18px; }
+    p { margin: 0; color: #9ca3af; }
+    button {
+      width: max-content;
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 18px;
+      color: #0f172a;
+      background: #67e8f9;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    canvas { width: 920px; max-width: 100%; border: 1px solid #374151; border-radius: 10px; background: #f8fafc; }
+    #status { min-height: 24px; font-weight: 700; }
+    .pass { color: #86efac; }
+    .fail { color: #fca5a5; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 10px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #374151; text-align: left; }
+    th { color: #cbd5e1; background: #1f2937; }
+    td { color: #d1d5db; background: #111827; }
+    code { color: #bae6fd; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Text render contract</h1>
+    <p>Click <code>Render</code>. PASS requires every rendered text pixel inside its bbox, all blocks using the same non-size style. Font size may shrink per bbox.</p>
+    <button id="render">Render</button>
+    <div id="status">Not run.</div>
+    <canvas id="canvas" width="920" height="560"></canvas>
+    <table>
+      <thead>
+        <tr><th>Block</th><th>Font px</th><th>Bounds</th><th>Style</th><th>Result</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const statusEl = document.getElementById('status');
+    const rowsEl = document.getElementById('rows');
+
+    const blocks = [
+      { id: 'A', x: 48,  y: 48,  width: 220, height: 74,  text: 'Short text' },
+      { id: 'B', x: 318, y: 44,  width: 250, height: 82,  text: 'A much longer sentence that must shrink and wrap inside this exact text block.' },
+      { id: 'C', x: 628, y: 38,  width: 210, height: 116, text: 'Two lines are okay, but no glyph may escape this region.' },
+      { id: 'D', x: 82,  y: 202, width: 176, height: 154, text: 'Tall narrow block with a translation that wraps many times.' },
+      { id: 'E', x: 326, y: 222, width: 250, height: 96,  text: 'Same font, same color, same weight. Only size changes.' },
+      { id: 'F', x: 642, y: 228, width: 178, height: 86,  text: 'Tiny box still clips safely and shrinks.' },
+      { id: 'G', x: 214, y: 402, width: 492, height: 76,  text: 'One wide subtitle-style region: identical style rule, independent fit.' }
+    ];
+
+    const sharedStyle = Object.freeze({
+      fontFamily: 'Arial, "Noto Sans", system-ui, sans-serif',
+      fontWeight: '700',
+      fillStyle: '#111827',
+      strokeStyle: 'rgba(255, 255, 255, 0.72)',
+      strokeWidthRatio: 0.055,
+      lineHeight: 1.18,
+      textAlign: 'center',
+      padding: 8,
+      minFontSize: 4,
+      maxFontSize: 42
+    });
+
+    function font(style, size) {
+      return `${style.fontWeight} ${size}px ${style.fontFamily}`;
+    }
+
+    function styleSignature(style) {
+      return JSON.stringify({
+        fontFamily: style.fontFamily,
+        fontWeight: style.fontWeight,
+        fillStyle: style.fillStyle,
+        strokeStyle: style.strokeStyle,
+        strokeWidthRatio: style.strokeWidthRatio,
+        lineHeight: style.lineHeight,
+        textAlign: style.textAlign,
+        padding: style.padding
+      });
+    }
+
+    function wrapParagraph(ctx, text, maxWidth) {
+      const words = text.trim().split(/\s+/).filter(Boolean);
+      const lines = [];
+      let line = '';
+      for (const word of words) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          line = candidate;
+          continue;
+        }
+        if (line) lines.push(line);
+        if (ctx.measureText(word).width <= maxWidth) {
+          line = word;
+          continue;
+        }
+        let chunk = '';
+        for (const char of word) {
+          const next = chunk + char;
+          if (ctx.measureText(next).width <= maxWidth || !chunk) {
+            chunk = next;
+          } else {
+            lines.push(chunk);
+            chunk = char;
+          }
+        }
+        line = chunk;
+      }
+      if (line) lines.push(line);
+      return lines.length ? lines : [''];
+    }
+
+    function measureLines(ctx, lines, size, style) {
+      const strokePad = Math.max(1, Math.ceil(size * style.strokeWidthRatio)) + 1;
+      const lineGap = size * style.lineHeight;
+      const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width), 0) + strokePad * 2;
+      const height = lines.length * lineGap + strokePad * 2;
+      return { width: maxWidth, height, strokePad, lineGap };
+    }
+
+    function layoutBlock(block, style) {
+      const innerWidth = Math.max(1, block.width - style.padding * 2);
+      const innerHeight = Math.max(1, block.height - style.padding * 2);
+      let best = null;
+      let lo = style.minFontSize;
+      let hi = style.maxFontSize;
+      while (lo <= hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        ctx.font = font(style, mid);
+        const lines = block.text.split(/\n/).flatMap(part => wrapParagraph(ctx, part, innerWidth));
+        const metrics = measureLines(ctx, lines, mid, style);
+        if (metrics.width <= innerWidth && metrics.height <= innerHeight) {
+          best = { fontSize: mid, lines, metrics, fits: true };
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      if (best) return best;
+      ctx.font = font(style, style.minFontSize);
+      const lines = block.text.split(/\n/).flatMap(part => wrapParagraph(ctx, part, innerWidth));
+      return { fontSize: style.minFontSize, lines, metrics: measureLines(ctx, lines, style.minFontSize, style), fits: false };
+    }
+
+    function renderBlock(target, block, layout, style) {
+      target.save();
+      target.beginPath();
+      target.rect(block.x, block.y, block.width, block.height);
+      target.clip();
+      target.font = font(style, layout.fontSize);
+      target.textAlign = style.textAlign;
+      target.textBaseline = 'middle';
+      target.fillStyle = style.fillStyle;
+      target.strokeStyle = style.strokeStyle;
+      target.lineWidth = Math.max(1, layout.fontSize * style.strokeWidthRatio);
+      target.lineJoin = 'round';
+
+      const centerX = block.x + block.width / 2;
+      const totalHeight = layout.lines.length * layout.metrics.lineGap;
+      const firstY = block.y + (block.height - totalHeight) / 2 + layout.metrics.lineGap / 2;
+      layout.lines.forEach((line, i) => {
+        const y = firstY + i * layout.metrics.lineGap;
+        target.strokeText(line, centerX, y);
+        target.fillText(line, centerX, y);
+      });
+      target.restore();
+    }
+
+    function drawBoxes(target) {
+      target.save();
+      target.lineWidth = 2;
+      target.font = '700 12px system-ui';
+      for (const block of blocks) {
+        target.strokeStyle = '#ef4444';
+        target.strokeRect(block.x, block.y, block.width, block.height);
+        target.fillStyle = '#ef4444';
+        target.fillText(block.id, block.x + 5, block.y + 15);
+      }
+      target.restore();
+    }
+
+    function isInsideAnyBlock(x, y) {
+      return blocks.some(b => x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height);
+    }
+
+    function scanOutsideInk(textLayer) {
+      const data = textLayer.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, textLayer.width, textLayer.height).data;
+      const leaks = [];
+      for (let y = 0; y < textLayer.height; y++) {
+        for (let x = 0; x < textLayer.width; x++) {
+          const alpha = data[(y * textLayer.width + x) * 4 + 3];
+          if (alpha > 8 && !isInsideAnyBlock(x, y)) {
+            leaks.push([x, y]);
+            if (leaks.length >= 10) return leaks;
+          }
+        }
+      }
+      return leaks;
+    }
+
+    function renderAll() {
+      rowsEl.textContent = '';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const textLayer = document.createElement('canvas');
+      textLayer.width = canvas.width;
+      textLayer.height = canvas.height;
+      const textCtx = textLayer.getContext('2d', { willReadFrequently: true });
+
+      const expectedStyle = styleSignature(sharedStyle);
+      const results = blocks.map(block => {
+        const layout = layoutBlock(block, sharedStyle);
+        renderBlock(textCtx, block, layout, sharedStyle);
+        return {
+          id: block.id,
+          fontSize: layout.fontSize,
+          fits: layout.fits,
+          bounds: `${Math.round(layout.metrics.width)}×${Math.round(layout.metrics.height)} / ${block.width}×${block.height}`,
+          style: styleSignature(sharedStyle)
+        };
+      });
+
+      ctx.drawImage(textLayer, 0, 0);
+      drawBoxes(ctx);
+
+      const leaks = scanOutsideInk(textLayer);
+      const styleOk = results.every(r => r.style === expectedStyle);
+      const fitOk = results.every(r => r.fits);
+      const pass = leaks.length === 0 && styleOk && fitOk;
+
+      for (const result of results) {
+        const tr = document.createElement('tr');
+        const ok = result.fits && result.style === expectedStyle;
+        tr.innerHTML = `<td>${result.id}</td><td>${result.fontSize}</td><td>${result.bounds}</td><td>shared</td><td class="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'}</td>`;
+        rowsEl.appendChild(tr);
+      }
+
+      statusEl.className = pass ? 'pass' : 'fail';
+      statusEl.textContent = pass
+        ? 'PASS — all text pixels are inside bbox; all blocks share non-size style.'
+        : `FAIL — leaks=${leaks.length}, fit=${fitOk}, style=${styleOk}`;
+    }
+
+    document.getElementById('render').addEventListener('click', renderAll);
+    renderAll();
+  </script>
+</body>
+</html>
